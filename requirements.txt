@@ -1,0 +1,4 @@
+apache-airflow-providers-facebook
+apache-airflow-providers-google
+pandas
+apache-airflow-providers-fab
