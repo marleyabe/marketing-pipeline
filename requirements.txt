@@ -1,4 +1,3 @@
-apache-airflow-providers-facebook
-apache-airflow-providers-google
-pandas
-apache-airflow-providers-fab
+facebook-business==24.0.1,
+google-ads==29.2.0,
+pandas==3.0.1
