@@ -18,7 +18,7 @@ POSTGRES_CONN = (
     f"postgresql+psycopg2://{os.environ['POSTGRES_USERNAME']}:{os.environ['POSTGRES_PASSWORD']}"
     f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DATABASE']}"
 )
-BRONZE_TABLE = "bronze.meta_ads_performance"
+BRONZE_TABLE = "bronze.meta_ads"
 
 def init_meta_api():
     """Inicializa a sessão da API do Meta."""
@@ -37,19 +37,22 @@ def init_meta_api():
 def daily_extract_meta_ads():
 
     @task()
-    def list_accounts() -> list[str]:
+    def list_accounts() -> list[dict]:
         """Lista contas de anúncio ativas."""
         init_meta_api()
         me = User(fbid='me')
         accounts = me.get_ad_accounts(fields=['name', 'account_status'])
 
         # account_status 1 = ACTIVE
-        account_ids = [acc['id'] for acc in accounts if acc.get('account_status') == 1]
-        print(f"Total de contas ativas encontradas: {len(account_ids)}")
-        return account_ids
+        active_accounts = [
+            {"id": acc['id'], "name": acc.get('name', '')}
+            for acc in accounts if acc.get('account_status') == 1
+        ]
+        print(f"Total de contas ativas encontradas: {len(active_accounts)}")
+        return active_accounts
 
     @task()
-    def extract_ads(account_ids: list[str]) -> list[dict]:
+    def extract_ads(accounts: list[dict]) -> list[dict]:
         """Extrai métricas (Insights) no nível do anúncio de cada conta."""
         context = get_current_context()
         extraction_date = str(context["data_interval_start"].date())
@@ -60,7 +63,7 @@ def daily_extract_meta_ads():
             'campaign_id', 'campaign_name', 'impressions',
             'clicks', 'spend'
         ]
-        
+
         # Parâmetros para buscar dados de D-1
         params = {
             'level': 'ad',
@@ -69,8 +72,10 @@ def daily_extract_meta_ads():
 
         all_ads = []
 
-        for account_id in account_ids:
-            print(f"Extraindo ads da conta: {account_id}")
+        for account in accounts:
+            account_id = account['id']
+            account_name = account['name']
+            print(f"Extraindo ads da conta: {account_id} - {account_name}")
             try:
                 acc = AdAccount(account_id)
                 insights = acc.get_insights(fields=fields, params=params)
@@ -78,6 +83,7 @@ def daily_extract_meta_ads():
                 for row in insights:
                     all_ads.append({
                         "account_id": account_id,
+                        "account_name": account_name,
                         "ad_id": row.get('ad_id'),
                         "ad_name": row.get('ad_name'),
                         "adset_id": row.get('adset_id'),
@@ -111,7 +117,7 @@ def daily_extract_meta_ads():
             conn.execute(text("CREATE SCHEMA IF NOT EXISTS bronze"))
 
         df.to_sql(
-            name="meta_ads_performance",
+            name="meta_ads",
             schema="bronze",
             con=engine,
             if_exists="append",
@@ -120,8 +126,8 @@ def daily_extract_meta_ads():
 
         print(f"{len(df)} ads salvos na tabela {BRONZE_TABLE}")
 
-    account_ids = list_accounts()
-    ads = extract_ads(account_ids)
+    accounts = list_accounts()
+    ads = extract_ads(accounts)
     load_to_postgres(ads)
 
 daily_extract_meta_ads()

@@ -16,7 +16,7 @@ POSTGRES_CONN = (
     f"postgresql+psycopg2://{os.environ['POSTGRES_USERNAME']}:{os.environ['POSTGRES_PASSWORD']}"
     f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DATABASE']}"
 )
-BRONZE_TABLE = "bronze.google_ads_keywords"
+BRONZE_TABLE = "bronze.google_ads"
 
 
 def get_google_ads_client():
@@ -158,7 +158,7 @@ def daily_extract_google_ads():
             conn.execute(text("CREATE SCHEMA IF NOT EXISTS bronze"))
 
         df.to_sql(
-            name="google_ads_keywords",
+            name="google_ads",
             schema="bronze",
             con=engine,
             if_exists="append",
