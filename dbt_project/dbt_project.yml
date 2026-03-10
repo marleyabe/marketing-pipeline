@@ -1,0 +1,14 @@
+name: 'ads2u'
+version: '1.0.0'
+
+profile: 'ads2u'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"

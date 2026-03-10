@@ -4,3 +4,6 @@ pandas==3.0.1
 python-dotenv
 sqlalchemy==2.0.40
 psycopg2-binary==2.9.10
+dbt-core==1.11.0
+dbt-postgres==1.10.0
+astronomer-cosmos==1.13.1
