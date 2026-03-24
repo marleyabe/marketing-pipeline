@@ -1,3 +1,6 @@
-facebook-business==24.0.1,
-google-ads==29.2.0,
-pandas==3.0.1
+duckdb>=1.2.0
+pandas>=2.0.0
+facebook-business>=24.0.0
+google-ads>=29.0.0
+pyyaml>=6.0
+apache-airflow-providers-fab>=2.0.1
