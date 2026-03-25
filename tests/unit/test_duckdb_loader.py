@@ -42,10 +42,10 @@ class TestDuckDBBronzeLoader:
         ).fetchone()
         assert result[0] == "meta_ads"
 
-    def test_load_google_ads_creates_rows(self, loader, memory_connection, sample_google_ads_data):
-        loader.load(sample_google_ads_data, "google_ads_raw", source="google_ads")
+    def test_load_google_ads_keywords_creates_rows(self, loader, memory_connection, sample_google_ads_data):
+        loader.load(sample_google_ads_data, "google_ads_keywords_raw", source="google_ads_keywords")
         count = memory_connection.execute(
-            "SELECT COUNT(*) FROM bronze.google_ads_raw"
+            "SELECT COUNT(*) FROM bronze.google_ads_keywords_raw"
         ).fetchone()[0]
         assert count == 2
 

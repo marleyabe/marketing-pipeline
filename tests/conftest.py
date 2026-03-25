@@ -59,16 +59,21 @@ def sample_meta_ads_data():
 
 @pytest.fixture
 def sample_google_ads_data():
-    """Sample raw data mimicking Google Ads API response."""
+    """Sample raw data mimicking Google Ads Keywords API response."""
     return [
         {
             "customer_id": "789012",
             "customer_name": "Cliente B",
             "campaign_id": "g_camp_1",
             "campaign_name": "Google Campanha 1",
+            "ad_group_id": "ag_1",
+            "ad_group_name": "Grupo de Anúncios 1",
+            "keyword_id": "kw_1",
+            "keyword_text": "palavra chave 1",
+            "match_type": "BROAD",
             "impressions": 1500,
             "clicks": 60,
-            "cost_micros": 150000000,
+            "spend": 150.0,
             "conversions": 8.0,
             "date": "2026-03-22",
         },
@@ -77,9 +82,14 @@ def sample_google_ads_data():
             "customer_name": "Cliente B",
             "campaign_id": "g_camp_2",
             "campaign_name": "Google Campanha 2",
+            "ad_group_id": "ag_2",
+            "ad_group_name": "Grupo de Anúncios 2",
+            "keyword_id": "kw_2",
+            "keyword_text": "palavra chave 2",
+            "match_type": "EXACT",
             "impressions": 3000,
             "clicks": 120,
-            "cost_micros": 300000000,
+            "spend": 300.0,
             "conversions": 15.0,
             "date": "2026-03-22",
         },

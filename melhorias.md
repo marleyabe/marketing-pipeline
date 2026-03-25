@@ -1,0 +1,65 @@
+# Melhorias — Ads2u Marketing Pipeline
+
+## Dados (Extração)
+
+**1. Mais granularidade no Google Ads — palavras-chave**
+- Adicionar DAG/extractor para `KeywordView` com métricas por keyword
+
+**2. Mais granularidade no Meta Ads — nível de anúncio**
+- Hoje o bronze já tem `ad_id` e `ad_name`, mas verificar se os dados estão chegando corretamente por anúncio com `level: ad`
+
+**3. Dados históricos (backfill)**
+- Hoje só extrai o dia atual. Adicionar DAG de backfill para carregar os últimos 30/90 dias
+
+**4. Google Ads — mais métricas**
+- `view_through_conversions`, `all_conversions`, `search_impression_share`, `quality_score` por keyword
+
+**5. Meta Ads — breakdown por dispositivo e posicionamento**
+- Separar dados por `device_platform` (mobile/desktop) e `publisher_platform` (feed, stories, reels)
+
+---
+
+## Análise (Gold Layer)
+
+**6. Comparativo mês a mês (MoM)**
+- Hoje só tem day-over-day nos alertas. Adicionar tabela gold com comparativo mensal
+
+**7. Projeção de gasto mensal**
+- Com base nos dias rodados, projetar quanto vai gastar no mês para comparar com o orçamento
+
+**8. Ranking de campanhas por eficiência**
+- ROAS, CPA, CTR rankeados por conta para identificar o melhor e pior performer
+
+**9. Detecção de anomalias mais sofisticada**
+- Hoje os thresholds são fixos (30%/50%). Usar média móvel dos últimos 7 dias como baseline
+
+---
+
+## Entregas (Output)
+
+**10. Envio de relatórios por WhatsApp**
+- Usar a Evolution API ou Z-API para enviar os textos já gerados em `gold.generated_reports` diretamente para o cliente
+
+**11. Envio de alertas por WhatsApp/Telegram**
+- Quando um alerta `critical` for detectado, disparar mensagem imediata (não esperar o dia seguinte)
+
+**12. Dashboard com Evidence.dev ou Metabase**
+- Conectar direto no DuckDB para visualização — sem banco extra
+
+**16. Migrar banco de dados para PostgreSQL** ⚠️ URGENTE
+- DuckDB não suporta múltiplas conexões simultâneas — bloqueia quando Airflow escreve e dashboard lê ao mesmo tempo
+- Postgres já está no stack (usado pelo Airflow), basta apontar o pipeline para ele
+- Requer reescrita do `DuckDBBronzeLoader` (remover sintaxe `BY NAME`) e dos SQLs de transformação em `sql/silver/` e `sql/gold/`
+
+---
+
+## Operacional
+
+**13. Retry automático por conta**
+- Hoje se uma conta falha, silencia o erro. Adicionar reprocessamento individual por conta com 3 tentativas
+
+**14. Monitoramento do pipeline**
+- Tabela `pipeline_runs` com tempo de execução, contas processadas, erros por DAG — para auditar o histórico
+
+**15. Alertas de falha do próprio pipeline**
+- Se uma DAG falhar, receber notificação (email/WhatsApp) antes de perceber que os dados não chegaram

@@ -45,9 +45,14 @@ def full_pipeline(memory_connection):
             "customer_name": "Cliente Beta",
             "campaign_id": "gc1",
             "campaign_name": "Camp Google 1",
+            "ad_group_id": "ag_1",
+            "ad_group_name": "Grupo 1",
+            "keyword_id": "kw_1",
+            "keyword_text": "palavra chave 1",
+            "match_type": "BROAD",
             "impressions": 3000,
             "clicks": 150,
-            "cost_micros": 300000000,
+            "spend": 300.0,
             "conversions": 12.0,
             "date": "2026-03-21",
         },
@@ -76,18 +81,23 @@ def full_pipeline(memory_connection):
             "customer_name": "Cliente Beta",
             "campaign_id": "gc1",
             "campaign_name": "Camp Google 1",
+            "ad_group_id": "ag_1",
+            "ad_group_name": "Grupo 1",
+            "keyword_id": "kw_1",
+            "keyword_text": "palavra chave 1",
+            "match_type": "BROAD",
             "impressions": 2800,
             "clicks": 140,
-            "cost_micros": 280000000,
+            "spend": 280.0,
             "conversions": 11.0,
             "date": "2026-03-22",
         },
     ]
 
     loader.load(meta_day1, "meta_ads_raw", source="meta_ads")
-    loader.load(google_day1, "google_ads_raw", source="google_ads")
+    loader.load(google_day1, "google_ads_keywords_raw", source="google_ads_keywords")
     loader.load(meta_day2, "meta_ads_raw", source="meta_ads")
-    loader.load(google_day2, "google_ads_raw", source="google_ads")
+    loader.load(google_day2, "google_ads_keywords_raw", source="google_ads_keywords")
 
     # Run all SQL transforms (silver + gold)
     SQLRunner(conn, SQL_DIR).run_all()
@@ -132,7 +142,7 @@ class TestFullPipelineE2E:
             "SELECT COUNT(*) FROM bronze.meta_ads_raw"
         ).fetchone()[0]
         google_count = conn.execute(
-            "SELECT COUNT(*) FROM bronze.google_ads_raw"
+            "SELECT COUNT(*) FROM bronze.google_ads_keywords_raw"
         ).fetchone()[0]
         assert meta_count == 2  # 2 days
         assert google_count == 2

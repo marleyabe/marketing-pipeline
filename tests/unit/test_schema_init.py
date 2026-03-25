@@ -38,21 +38,24 @@ class TestInitializeSchemas:
         assert "_extracted_at" in column_names
         assert "_source" in column_names
 
-    def test_creates_bronze_google_ads_table(self, memory_connection):
+    def test_creates_bronze_google_ads_keywords_table(self, memory_connection):
         initialize_schemas(memory_connection)
 
         columns = memory_connection.execute(
             "SELECT column_name FROM information_schema.columns "
-            "WHERE table_schema = 'bronze' AND table_name = 'google_ads_raw' "
+            "WHERE table_schema = 'bronze' AND table_name = 'google_ads_keywords_raw' "
             "ORDER BY ordinal_position"
         ).fetchall()
         column_names = [c[0] for c in columns]
 
         assert "customer_id" in column_names
         assert "campaign_id" in column_names
+        assert "keyword_id" in column_names
+        assert "keyword_text" in column_names
+        assert "match_type" in column_names
         assert "impressions" in column_names
         assert "clicks" in column_names
-        assert "cost_micros" in column_names
+        assert "spend" in column_names
         assert "conversions" in column_names
         assert "date" in column_names
         assert "_extracted_at" in column_names

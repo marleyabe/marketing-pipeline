@@ -6,23 +6,29 @@ from src.extractors.base import BaseExtractor
 
 logger = logging.getLogger(__name__)
 
-CAMPAIGN_PERFORMANCE_QUERY = """
+KEYWORD_PERFORMANCE_QUERY = """
     SELECT
         customer.id,
         customer.descriptive_name,
         campaign.id,
         campaign.name,
+        ad_group.id,
+        ad_group.name,
+        ad_group_criterion.criterion_id,
+        ad_group_criterion.keyword.text,
+        ad_group_criterion.keyword.match_type,
         metrics.impressions,
         metrics.clicks,
         metrics.cost_micros,
         metrics.conversions,
         segments.date
-    FROM campaign
+    FROM keyword_view
     WHERE segments.date = '{date}'
+      AND ad_group_criterion.status != 'REMOVED'
 """
 
 
-class GoogleAdsExtractor(BaseExtractor):
+class GoogleAdsKeywordsExtractor(BaseExtractor):
     def __init__(self, credentials: dict):
         self._credentials = credentials
 
@@ -72,7 +78,7 @@ class GoogleAdsExtractor(BaseExtractor):
 
         for customer_id in account_ids:
             try:
-                query = CAMPAIGN_PERFORMANCE_QUERY.format(date=date)
+                query = KEYWORD_PERFORMANCE_QUERY.format(date=date)
                 rows = service.search(customer_id=customer_id, query=query)
 
                 for row in rows:
@@ -81,6 +87,11 @@ class GoogleAdsExtractor(BaseExtractor):
                         "customer_name": row.customer.descriptive_name,
                         "campaign_id": str(row.campaign.id),
                         "campaign_name": row.campaign.name,
+                        "ad_group_id": str(row.ad_group.id),
+                        "ad_group_name": row.ad_group.name,
+                        "keyword_id": str(row.ad_group_criterion.criterion_id),
+                        "keyword_text": row.ad_group_criterion.keyword.text,
+                        "match_type": row.ad_group_criterion.keyword.match_type.name,
                         "impressions": row.metrics.impressions,
                         "clicks": row.metrics.clicks,
                         "spend": row.metrics.cost_micros / 1_000_000,
@@ -88,6 +99,6 @@ class GoogleAdsExtractor(BaseExtractor):
                         "date": row.segments.date,
                     })
             except Exception:
-                logger.exception("Error extracting Google Ads for customer %s", customer_id)
+                logger.exception("Error extracting keywords for customer %s", customer_id)
 
         return results

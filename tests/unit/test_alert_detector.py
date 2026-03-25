@@ -44,7 +44,7 @@ def setup_with_two_days(memory_connection):
     loader.load(day2_meta, "meta_ads_raw", source="meta_ads")
 
     # Need at least empty google table for transforms
-    loader.load([], "google_ads_raw", source="google_ads")
+    loader.load([], "google_ads_keywords_raw", source="google_ads_keywords")
 
     SQLRunner(memory_connection, SQL_DIR).run_all()
 
@@ -115,7 +115,7 @@ class TestAlertDetector:
 
         loader.load(day1, "meta_ads_raw", source="meta_ads")
         loader.load(day2, "meta_ads_raw", source="meta_ads")
-        loader.load([], "google_ads_raw", source="google_ads")
+        loader.load([], "google_ads_keywords_raw", source="google_ads_keywords")
 
         SQLRunner(memory_connection, SQL_DIR).run_all()
 
