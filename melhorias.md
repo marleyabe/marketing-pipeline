@@ -2,14 +2,14 @@
 
 ## Dados (Extração)
 
-**1. Mais granularidade no Google Ads — palavras-chave**
-- Adicionar DAG/extractor para `KeywordView` com métricas por keyword
+**1. Mais granularidade no Google Ads — palavras-chave** ✅
+- Extractor usa `keyword_view` com métricas por keyword (customer, campaign, ad_group, keyword, impressions, clicks, spend, conversions)
 
-**2. Mais granularidade no Meta Ads — nível de anúncio**
-- Hoje o bronze já tem `ad_id` e `ad_name`, mas verificar se os dados estão chegando corretamente por anúncio com `level: ad`
+**2. Mais granularidade no Meta Ads — nível de anúncio** ✅
+- Extractor já usa `level: "ad"` com `ad_id` e `ad_name` nos campos extraídos
 
-**3. Dados históricos (backfill)**
-- Hoje só extrai o dia atual. Adicionar DAG de backfill para carregar os últimos 30/90 dias
+**3. Dados históricos (backfill)** ✅
+- DAGs `backfill_meta_ads` e `backfill_google_ads` com trigger manual e param `days_back` (30/90/180). Cada conta itera os dias e retorna uma linha por dia por anúncio/keyword
 
 **4. Google Ads — mais métricas**
 - `view_through_conversions`, `all_conversions`, `search_impression_share`, `quality_score` por keyword

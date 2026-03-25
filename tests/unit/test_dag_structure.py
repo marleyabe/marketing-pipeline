@@ -11,6 +11,8 @@ DAG_FILES = [
     "daily_transform",
     "daily_reports",
     "daily_alerts",
+    "backfill_meta_ads",
+    "backfill_google_ads",
 ]
 
 
@@ -55,3 +57,11 @@ class TestDagProperties:
     def test_alerts_has_daily_schedule(self):
         mod = importlib.import_module("daily_alerts")
         assert mod.dag.schedule == "@daily"
+
+    def test_backfill_meta_has_no_schedule(self):
+        mod = importlib.import_module("backfill_meta_ads")
+        assert mod.dag.schedule is None
+
+    def test_backfill_google_has_no_schedule(self):
+        mod = importlib.import_module("backfill_google_ads")
+        assert mod.dag.schedule is None
