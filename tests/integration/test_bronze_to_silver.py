@@ -28,12 +28,46 @@ class TestBronzeToSilver:
         count = conn.execute("SELECT COUNT(*) FROM silver.meta_ads").fetchone()[0]
         assert count == 2  # 2 unique ads
 
-    def test_silver_google_ads_converts_cost(self, setup_pipeline):
+    def test_silver_google_ads_spend_per_campaign(self, setup_pipeline):
         conn = setup_pipeline
         spend = conn.execute(
             "SELECT spend FROM silver.google_ads WHERE campaign_id = 'g_camp_1'"
         ).fetchone()[0]
-        assert spend == 150.0  # 150000000 / 1_000_000
+        assert spend == 150.0
+
+    def test_silver_google_ads_aggregates_multiple_keywords_into_one_campaign_row(self, memory_connection):
+        initialize_schemas(memory_connection)
+        loader = DuckDBBronzeLoader(memory_connection)
+        loader.load([
+            {
+                "customer_id": "789012", "customer_name": "Cliente B",
+                "campaign_id": "gc1", "campaign_name": "Camp Google",
+                "ad_group_id": "ag1", "ad_group_name": "Grupo 1",
+                "keyword_id": "kw1", "keyword_text": "palavra 1", "match_type": "BROAD",
+                "impressions": 1000, "clicks": 40, "spend": 100.0, "conversions": 5.0,
+                "date": "2026-03-22",
+            },
+            {
+                "customer_id": "789012", "customer_name": "Cliente B",
+                "campaign_id": "gc1", "campaign_name": "Camp Google",
+                "ad_group_id": "ag1", "ad_group_name": "Grupo 1",
+                "keyword_id": "kw2", "keyword_text": "palavra 2", "match_type": "EXACT",
+                "impressions": 500, "clicks": 20, "spend": 50.0, "conversions": 3.0,
+                "date": "2026-03-22",
+            },
+        ], "google_ads_raw", source="google_ads")
+
+        SQLRunner(memory_connection, SQL_DIR).run_silver()
+
+        rows = memory_connection.execute(
+            "SELECT impressions, clicks, spend, conversions FROM silver.google_ads WHERE campaign_id = 'gc1'"
+        ).fetchall()
+
+        assert len(rows) == 1
+        assert rows[0][0] == 1500   # impressions: 1000 + 500
+        assert rows[0][1] == 60     # clicks: 40 + 20
+        assert rows[0][2] == 150.0  # spend: 100 + 50
+        assert rows[0][3] == 8.0    # conversions: 5 + 3
 
     def test_silver_nulls_replaced_with_defaults(self, setup_pipeline):
         conn = setup_pipeline

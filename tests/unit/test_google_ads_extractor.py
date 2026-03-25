@@ -55,6 +55,63 @@ def _make_keyword_row(
     return row
 
 
+def _make_account_row(customer_id=111111, name="Cliente Ativo", manager=False, status="ENABLED"):
+    row = MagicMock()
+    row.customer_client.id = customer_id
+    row.customer_client.descriptive_name = name
+    row.customer_client.manager = manager
+    row.customer_client.status.name = status
+    return row
+
+
+class TestListAccounts:
+    @patch("src.extractors.google_ads.GoogleAdsClient")
+    def test_returns_enabled_non_manager_accounts(self, mock_client_cls, extractor):
+        mock_client = MagicMock()
+        mock_client_cls.load_from_dict.return_value = mock_client
+        mock_service = MagicMock()
+        mock_client.get_service.return_value = mock_service
+        mock_service.search.return_value = [
+            _make_account_row(111111, "Ativo"),
+            _make_account_row(222222, "Manager", manager=True),
+            _make_account_row(333333, "Cancelado", status="CANCELED"),
+        ]
+
+        accounts = extractor.list_accounts()
+
+        assert len(accounts) == 1
+        assert accounts[0]["customer_id"] == "111111"
+        assert accounts[0]["customer_name"] == "Ativo"
+
+    @patch("src.extractors.google_ads.GoogleAdsClient")
+    def test_returns_empty_when_no_active_accounts(self, mock_client_cls, extractor):
+        mock_client = MagicMock()
+        mock_client_cls.load_from_dict.return_value = mock_client
+        mock_service = MagicMock()
+        mock_client.get_service.return_value = mock_service
+        mock_service.search.return_value = [
+            _make_account_row(111111, "Manager", manager=True),
+        ]
+
+        assert extractor.list_accounts() == []
+
+    @patch("src.extractors.google_ads.GoogleAdsClient")
+    def test_returns_multiple_active_accounts(self, mock_client_cls, extractor):
+        mock_client = MagicMock()
+        mock_client_cls.load_from_dict.return_value = mock_client
+        mock_service = MagicMock()
+        mock_client.get_service.return_value = mock_service
+        mock_service.search.return_value = [
+            _make_account_row(111111, "Cliente A"),
+            _make_account_row(222222, "Cliente B"),
+        ]
+
+        accounts = extractor.list_accounts()
+
+        assert len(accounts) == 2
+        assert {a["customer_id"] for a in accounts} == {"111111", "222222"}
+
+
 class TestExtractKeywords:
     @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_returns_correct_schema(self, mock_client_cls, extractor):
