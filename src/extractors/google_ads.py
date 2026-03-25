@@ -28,7 +28,7 @@ KEYWORD_PERFORMANCE_QUERY = """
 """
 
 
-class GoogleAdsKeywordsExtractor(BaseExtractor):
+class GoogleAdsExtractor(BaseExtractor):
     def __init__(self, credentials: dict):
         self._credentials = credentials
 
@@ -99,6 +99,6 @@ class GoogleAdsKeywordsExtractor(BaseExtractor):
                         "date": row.segments.date,
                     })
             except Exception:
-                logger.exception("Error extracting keywords for customer %s", customer_id)
+                logger.exception("Error extracting data for customer %s", customer_id)
 
         return results

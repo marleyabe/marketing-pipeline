@@ -7,7 +7,7 @@ import pytest
 
 DAG_FILES = [
     "daily_extract_meta_ads",
-    "daily_extract_google_ads_keywords",
+    "daily_extract_google_ads",
     "daily_transform",
     "daily_reports",
     "daily_alerts",
@@ -40,8 +40,8 @@ class TestDagProperties:
         mod = importlib.import_module("daily_extract_meta_ads")
         assert mod.dag.schedule == "@daily"
 
-    def test_extract_google_keywords_has_daily_schedule(self):
-        mod = importlib.import_module("daily_extract_google_ads_keywords")
+    def test_extract_google_has_daily_schedule(self):
+        mod = importlib.import_module("daily_extract_google_ads")
         assert mod.dag.schedule == "@daily"
 
     def test_transform_has_daily_schedule(self):

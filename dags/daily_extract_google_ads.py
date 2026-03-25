@@ -3,7 +3,7 @@ from datetime import datetime
 
 from airflow.sdk import dag, task
 
-DAG_ID = "daily_extract_google_ads_keywords"
+DAG_ID = "daily_extract_google_ads"
 
 
 @dag(
@@ -11,15 +11,15 @@ DAG_ID = "daily_extract_google_ads_keywords"
     schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["extract", "google", "keywords"],
+    tags=["extract", "google"],
 )
-def daily_extract_google_ads_keywords():
+def daily_extract_google_ads():
 
     @task
     def list_accounts() -> list[dict]:
-        from src.extractors.google_ads_keywords import GoogleAdsKeywordsExtractor
+        from src.extractors.google_ads import GoogleAdsExtractor
 
-        extractor = GoogleAdsKeywordsExtractor({
+        extractor = GoogleAdsExtractor({
             "developer_token": os.environ["GOOGLE_DEVELOPER_TOKEN"],
             "client_id": os.environ["GOOGLE_CLIENT_ID"],
             "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
@@ -31,12 +31,12 @@ def daily_extract_google_ads_keywords():
     @task
     def extract_account(account: dict) -> list[dict]:
         from airflow.sdk import get_current_context
-        from src.extractors.google_ads_keywords import GoogleAdsKeywordsExtractor
+        from src.extractors.google_ads import GoogleAdsExtractor
 
         context = get_current_context()
         logical_date = context.get("logical_date")
         ds = logical_date.strftime("%Y-%m-%d") if logical_date else datetime.now().strftime("%Y-%m-%d")
-        extractor = GoogleAdsKeywordsExtractor({
+        extractor = GoogleAdsExtractor({
             "developer_token": os.environ["GOOGLE_DEVELOPER_TOKEN"],
             "client_id": os.environ["GOOGLE_CLIENT_ID"],
             "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
@@ -56,7 +56,7 @@ def daily_extract_google_ads_keywords():
         loader = DuckDBBronzeLoader(conn)
 
         for batch in batches:
-            loader.load(batch, "google_ads_keywords_raw", source="google_ads_keywords")
+            loader.load(batch, "google_ads_raw", source="google_ads")
 
         conn.close()
 
@@ -65,4 +65,4 @@ def daily_extract_google_ads_keywords():
     load(extracted)
 
 
-dag = daily_extract_google_ads_keywords()
+dag = daily_extract_google_ads()

@@ -16,7 +16,7 @@ WITH deduplicated AS (
             PARTITION BY customer_id, campaign_id, keyword_id, CAST(date AS VARCHAR)
             ORDER BY _extracted_at DESC
         ) AS rn
-    FROM bronze.google_ads_keywords_raw
+    FROM bronze.google_ads_raw
 )
 SELECT
     CAST(customer_id AS VARCHAR) AS account_id,

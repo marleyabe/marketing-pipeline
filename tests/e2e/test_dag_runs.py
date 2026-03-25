@@ -192,18 +192,18 @@ class TestDagExecution:
 
 class TestBronze:
 
-    def test_google_ads_keywords_raw_has_data(self, db):
-        count = db.execute("SELECT COUNT(*) FROM bronze.google_ads_keywords_raw").fetchone()[0]
-        assert count > 0, "bronze.google_ads_keywords_raw está vazia"
+    def test_google_ads_raw_has_data(self, db):
+        count = db.execute("SELECT COUNT(*) FROM bronze.google_ads_raw").fetchone()[0]
+        assert count > 0, "bronze.google_ads_raw está vazia"
 
     def test_meta_ads_raw_table_exists(self, db):
         # Meta pode retornar 0 registros se não houver dados no dia ou token expirou
         db.execute("SELECT COUNT(*) FROM bronze.meta_ads_raw").fetchone()
 
-    def test_google_ads_keywords_raw_schema(self, db):
+    def test_google_ads_raw_schema(self, db):
         cols = {r[0] for r in db.execute(
             "SELECT column_name FROM information_schema.columns "
-            "WHERE table_schema = 'bronze' AND table_name = 'google_ads_keywords_raw'"
+            "WHERE table_schema = 'bronze' AND table_name = 'google_ads_raw'"
         ).fetchall()}
         required = {"customer_id", "customer_name", "campaign_id", "campaign_name",
                     "ad_group_id", "ad_group_name", "keyword_id", "keyword_text", "match_type",
@@ -221,25 +221,25 @@ class TestBronze:
                     "_extracted_at", "_source"}
         assert required <= cols
 
-    def test_google_ads_keywords_raw_no_nulls_on_key_cols(self, db):
+    def test_google_ads_raw_no_nulls_on_key_cols(self, db):
         nulls = db.execute(
-            "SELECT COUNT(*) FROM bronze.google_ads_keywords_raw "
+            "SELECT COUNT(*) FROM bronze.google_ads_raw "
             "WHERE customer_id IS NULL OR campaign_id IS NULL OR date IS NULL"
         ).fetchone()[0]
         assert nulls == 0
 
-    def test_google_ads_keywords_raw_spend_positive(self, db):
+    def test_google_ads_raw_spend_positive(self, db):
         negatives = db.execute(
-            "SELECT COUNT(*) FROM bronze.google_ads_keywords_raw WHERE spend < 0"
+            "SELECT COUNT(*) FROM bronze.google_ads_raw WHERE spend < 0"
         ).fetchone()[0]
         assert negatives == 0
 
-    def test_today_in_google_ads_keywords_raw(self, db):
+    def test_today_in_google_ads_raw(self, db):
         today = date.today().isoformat()
         count = db.execute(
-            f"SELECT COUNT(*) FROM bronze.google_ads_keywords_raw WHERE CAST(date AS VARCHAR) = '{today}'"
+            f"SELECT COUNT(*) FROM bronze.google_ads_raw WHERE CAST(date AS VARCHAR) = '{today}'"
         ).fetchone()[0]
-        assert count > 0, f"Nenhum dado do dia {today} no google_ads_keywords_raw"
+        assert count > 0, f"Nenhum dado do dia {today} no google_ads_raw"
 
 
 # ---------------------------------------------------------------------------

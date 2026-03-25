@@ -95,9 +95,9 @@ def full_pipeline(memory_connection):
     ]
 
     loader.load(meta_day1, "meta_ads_raw", source="meta_ads")
-    loader.load(google_day1, "google_ads_keywords_raw", source="google_ads_keywords")
+    loader.load(google_day1, "google_ads_raw", source="google_ads")
     loader.load(meta_day2, "meta_ads_raw", source="meta_ads")
-    loader.load(google_day2, "google_ads_keywords_raw", source="google_ads_keywords")
+    loader.load(google_day2, "google_ads_raw", source="google_ads")
 
     # Run all SQL transforms (silver + gold)
     SQLRunner(conn, SQL_DIR).run_all()
@@ -142,7 +142,7 @@ class TestFullPipelineE2E:
             "SELECT COUNT(*) FROM bronze.meta_ads_raw"
         ).fetchone()[0]
         google_count = conn.execute(
-            "SELECT COUNT(*) FROM bronze.google_ads_keywords_raw"
+            "SELECT COUNT(*) FROM bronze.google_ads_raw"
         ).fetchone()[0]
         assert meta_count == 2  # 2 days
         assert google_count == 2

@@ -27,7 +27,7 @@ def initialize_schemas(conn: duckdb.DuckDBPyConnection) -> None:
     """)
 
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS bronze.google_ads_keywords_raw (
+        CREATE TABLE IF NOT EXISTS bronze.google_ads_raw (
             customer_id VARCHAR,
             customer_name VARCHAR,
             campaign_id VARCHAR,
@@ -43,6 +43,6 @@ def initialize_schemas(conn: duckdb.DuckDBPyConnection) -> None:
             conversions DOUBLE,
             date DATE,
             _extracted_at TIMESTAMP DEFAULT current_timestamp,
-            _source VARCHAR DEFAULT 'google_ads_keywords'
+            _source VARCHAR DEFAULT 'google_ads'
         )
     """)

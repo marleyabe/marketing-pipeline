@@ -16,7 +16,7 @@ def setup(memory_connection, sample_meta_ads_data, sample_google_ads_data):
     initialize_schemas(memory_connection)
     loader = DuckDBBronzeLoader(memory_connection)
     loader.load(sample_meta_ads_data, "meta_ads_raw", source="meta_ads")
-    loader.load(sample_google_ads_data, "google_ads_keywords_raw", source="google_ads_keywords")
+    loader.load(sample_google_ads_data, "google_ads_raw", source="google_ads")
     SQLRunner(memory_connection, SQL_DIR).run_all()
 
     memory_connection.execute("""

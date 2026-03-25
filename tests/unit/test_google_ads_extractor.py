@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.extractors.google_ads_keywords import GoogleAdsKeywordsExtractor
+from src.extractors.google_ads import GoogleAdsExtractor
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def credentials():
 
 @pytest.fixture
 def extractor(credentials):
-    return GoogleAdsKeywordsExtractor(credentials)
+    return GoogleAdsExtractor(credentials)
 
 
 def _make_keyword_row(
@@ -56,7 +56,7 @@ def _make_keyword_row(
 
 
 class TestExtractKeywords:
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_returns_correct_schema(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
@@ -77,7 +77,7 @@ class TestExtractKeywords:
         }
         assert set(results[0].keys()) == expected_keys
 
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_converts_cost_micros_to_currency(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
@@ -88,7 +88,7 @@ class TestExtractKeywords:
         results = extractor.extract(["111111"], date="2026-03-22")
         assert results[0]["spend"] == 75.0
 
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_maps_keyword_fields_correctly(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
@@ -108,7 +108,7 @@ class TestExtractKeywords:
         assert result["match_type"] == "BROAD"
         assert result["keyword_id"] == "9999"
 
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_handles_api_error_per_account(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
@@ -119,7 +119,7 @@ class TestExtractKeywords:
         results = extractor.extract(["111111"], date="2026-03-22")
         assert results == []
 
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_handles_empty_response(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
@@ -130,7 +130,7 @@ class TestExtractKeywords:
         results = extractor.extract(["111111"], date="2026-03-22")
         assert results == []
 
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_extracts_multiple_accounts(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
@@ -144,7 +144,7 @@ class TestExtractKeywords:
         results = extractor.extract(["111111", "222222"], date="2026-03-22")
         assert len(results) == 2
 
-    @patch("src.extractors.google_ads_keywords.GoogleAdsClient")
+    @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_error_in_one_account_does_not_stop_others(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
