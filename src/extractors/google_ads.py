@@ -21,6 +21,10 @@ KEYWORD_PERFORMANCE_QUERY = """
         metrics.clicks,
         metrics.cost_micros,
         metrics.conversions,
+        metrics.view_through_conversions,
+        metrics.all_conversions,
+        metrics.search_impression_share,
+        ad_group_criterion.quality_info.quality_score,
         segments.date
     FROM keyword_view
     WHERE segments.date = '{date}'
@@ -96,6 +100,10 @@ class GoogleAdsExtractor(BaseExtractor):
                         "clicks": row.metrics.clicks,
                         "spend": row.metrics.cost_micros / 1_000_000,
                         "conversions": row.metrics.conversions,
+                        "view_through_conversions": row.metrics.view_through_conversions,
+                        "all_conversions": row.metrics.all_conversions,
+                        "search_impression_share": row.metrics.search_impression_share,
+                        "quality_score": row.ad_group_criterion.quality_info.quality_score,
                         "date": row.segments.date,
                     })
             except Exception:

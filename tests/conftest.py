@@ -75,6 +75,10 @@ def sample_google_ads_data():
             "clicks": 60,
             "spend": 150.0,
             "conversions": 8.0,
+            "view_through_conversions": 1.0,
+            "all_conversions": 10.0,
+            "search_impression_share": 0.85,
+            "quality_score": 7,
             "date": "2026-03-22",
         },
         {
@@ -91,6 +95,10 @@ def sample_google_ads_data():
             "clicks": 120,
             "spend": 300.0,
             "conversions": 15.0,
+            "view_through_conversions": 2.0,
+            "all_conversions": 18.0,
+            "search_impression_share": 0.92,
+            "quality_score": 9,
             "date": "2026-03-22",
         },
     ]

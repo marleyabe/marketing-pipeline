@@ -10,6 +10,10 @@ WITH deduplicated AS (
         clicks,
         spend,
         conversions,
+        view_through_conversions,
+        all_conversions,
+        search_impression_share,
+        quality_score,
         date,
         _extracted_at,
         ROW_NUMBER() OVER (
@@ -30,6 +34,10 @@ SELECT
     SUM(COALESCE(spend, 0.0))::DOUBLE AS spend,
     CAST(date AS DATE) AS date,
     SUM(COALESCE(conversions, 0.0))::DOUBLE AS conversions,
+    SUM(COALESCE(view_through_conversions, 0.0))::DOUBLE AS view_through_conversions,
+    SUM(COALESCE(all_conversions, 0.0))::DOUBLE AS all_conversions,
+    AVG(search_impression_share)::DOUBLE AS search_impression_share,
+    AVG(quality_score)::DOUBLE AS quality_score,
     NULL::VARCHAR AS actions_raw,
     MAX(_extracted_at) AS _extracted_at,
     'google_ads' AS platform

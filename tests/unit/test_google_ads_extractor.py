@@ -35,6 +35,10 @@ def _make_keyword_row(
     clicks=30,
     cost_micros=60000000,
     conversions=3.0,
+    view_through_conversions=1.0,
+    all_conversions=4.0,
+    search_impression_share=0.85,
+    quality_score=7,
     date="2026-03-22",
 ):
     row = MagicMock()
@@ -47,10 +51,14 @@ def _make_keyword_row(
     row.ad_group_criterion.criterion_id = criterion_id
     row.ad_group_criterion.keyword.text = keyword_text
     row.ad_group_criterion.keyword.match_type.name = match_type_name
+    row.ad_group_criterion.quality_info.quality_score = quality_score
     row.metrics.impressions = impressions
     row.metrics.clicks = clicks
     row.metrics.cost_micros = cost_micros
     row.metrics.conversions = conversions
+    row.metrics.view_through_conversions = view_through_conversions
+    row.metrics.all_conversions = all_conversions
+    row.metrics.search_impression_share = search_impression_share
     row.segments.date = date
     return row
 
@@ -130,6 +138,8 @@ class TestExtractKeywords:
             "ad_group_id", "ad_group_name",
             "keyword_id", "keyword_text", "match_type",
             "impressions", "clicks", "spend", "conversions",
+            "view_through_conversions", "all_conversions",
+            "search_impression_share", "quality_score",
             "date",
         }
         assert set(results[0].keys()) == expected_keys
@@ -164,6 +174,28 @@ class TestExtractKeywords:
         assert result["keyword_text"] == "tênis masculino"
         assert result["match_type"] == "BROAD"
         assert result["keyword_id"] == "9999"
+
+    @patch("src.extractors.google_ads.GoogleAdsClient")
+    def test_maps_new_metrics_correctly(self, mock_client_cls, extractor):
+        mock_client = MagicMock()
+        mock_client_cls.load_from_dict.return_value = mock_client
+        mock_service = MagicMock()
+        mock_client.get_service.return_value = mock_service
+        mock_service.search.return_value = [
+            _make_keyword_row(
+                view_through_conversions=2.0,
+                all_conversions=5.0,
+                search_impression_share=0.72,
+                quality_score=9,
+            )
+        ]
+
+        results = extractor.extract(["111111"], date="2026-03-22")
+        result = results[0]
+        assert result["view_through_conversions"] == 2.0
+        assert result["all_conversions"] == 5.0
+        assert result["search_impression_share"] == 0.72
+        assert result["quality_score"] == 9
 
     @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_handles_api_error_per_account(self, mock_client_cls, extractor):

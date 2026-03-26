@@ -57,6 +57,10 @@ class TestInitializeSchemas:
         assert "clicks" in column_names
         assert "spend" in column_names
         assert "conversions" in column_names
+        assert "view_through_conversions" in column_names
+        assert "all_conversions" in column_names
+        assert "search_impression_share" in column_names
+        assert "quality_score" in column_names
         assert "date" in column_names
         assert "_extracted_at" in column_names
         assert "_source" in column_names
