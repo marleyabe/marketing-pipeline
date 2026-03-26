@@ -39,6 +39,7 @@ def _make_keyword_row(
     all_conversions=4.0,
     search_impression_share=0.85,
     quality_score=7,
+    device_name="DESKTOP",
     date="2026-03-22",
 ):
     row = MagicMock()
@@ -59,6 +60,7 @@ def _make_keyword_row(
     row.metrics.view_through_conversions = view_through_conversions
     row.metrics.all_conversions = all_conversions
     row.metrics.search_impression_share = search_impression_share
+    row.segments.device.name = device_name
     row.segments.date = date
     return row
 
@@ -140,7 +142,7 @@ class TestExtractKeywords:
             "impressions", "clicks", "spend", "conversions",
             "view_through_conversions", "all_conversions",
             "search_impression_share", "quality_score",
-            "date",
+            "device", "date",
         }
         assert set(results[0].keys()) == expected_keys
 
@@ -196,6 +198,21 @@ class TestExtractKeywords:
         assert result["all_conversions"] == 5.0
         assert result["search_impression_share"] == 0.72
         assert result["quality_score"] == 9
+
+    @patch("src.extractors.google_ads.GoogleAdsClient")
+    def test_maps_device_correctly(self, mock_client_cls, extractor):
+        mock_client = MagicMock()
+        mock_client_cls.load_from_dict.return_value = mock_client
+        mock_service = MagicMock()
+        mock_client.get_service.return_value = mock_service
+        mock_service.search.return_value = [
+            _make_keyword_row(device_name="MOBILE"),
+            _make_keyword_row(device_name="TABLET"),
+        ]
+
+        results = extractor.extract(["111111"], date="2026-03-22")
+        assert results[0]["device"] == "MOBILE"
+        assert results[1]["device"] == "TABLET"
 
     @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_handles_api_error_per_account(self, mock_client_cls, extractor):

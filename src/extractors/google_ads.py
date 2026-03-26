@@ -25,6 +25,7 @@ KEYWORD_PERFORMANCE_QUERY = """
         metrics.all_conversions,
         metrics.search_impression_share,
         ad_group_criterion.quality_info.quality_score,
+        segments.device,
         segments.date
     FROM keyword_view
     WHERE segments.date = '{date}'
@@ -104,6 +105,7 @@ class GoogleAdsExtractor(BaseExtractor):
                         "all_conversions": row.metrics.all_conversions,
                         "search_impression_share": row.metrics.search_impression_share,
                         "quality_score": row.ad_group_criterion.quality_info.quality_score,
+                        "device": row.segments.device.name,
                         "date": row.segments.date,
                     })
             except Exception:

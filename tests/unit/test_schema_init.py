@@ -61,6 +61,7 @@ class TestInitializeSchemas:
         assert "all_conversions" in column_names
         assert "search_impression_share" in column_names
         assert "quality_score" in column_names
+        assert "device" in column_names
         assert "date" in column_names
         assert "_extracted_at" in column_names
         assert "_source" in column_names

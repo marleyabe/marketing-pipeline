@@ -6,6 +6,7 @@ WITH deduplicated AS (
         campaign_id,
         campaign_name,
         keyword_id,
+        device,
         impressions,
         clicks,
         spend,
@@ -17,7 +18,7 @@ WITH deduplicated AS (
         date,
         _extracted_at,
         ROW_NUMBER() OVER (
-            PARTITION BY customer_id, campaign_id, keyword_id, CAST(date AS VARCHAR)
+            PARTITION BY customer_id, campaign_id, keyword_id, device, CAST(date AS VARCHAR)
             ORDER BY _extracted_at DESC
         ) AS rn
     FROM bronze.google_ads_raw
@@ -29,6 +30,7 @@ SELECT
     CAST(campaign_name AS VARCHAR) AS campaign_name,
     NULL::VARCHAR AS ad_id,
     NULL::VARCHAR AS ad_name,
+    CAST(device AS VARCHAR) AS device,
     SUM(COALESCE(impressions, 0))::BIGINT AS impressions,
     SUM(COALESCE(clicks, 0))::BIGINT AS clicks,
     SUM(COALESCE(spend, 0.0))::DOUBLE AS spend,
@@ -43,4 +45,4 @@ SELECT
     'google_ads' AS platform
 FROM deduplicated
 WHERE rn = 1
-GROUP BY customer_id, customer_name, campaign_id, campaign_name, date;
+GROUP BY customer_id, customer_name, campaign_id, campaign_name, device, date;

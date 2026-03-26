@@ -79,6 +79,7 @@ def sample_google_ads_data():
             "all_conversions": 10.0,
             "search_impression_share": 0.85,
             "quality_score": 7,
+            "device": "MOBILE",
             "date": "2026-03-22",
         },
         {
@@ -99,6 +100,7 @@ def sample_google_ads_data():
             "all_conversions": 18.0,
             "search_impression_share": 0.92,
             "quality_score": 9,
+            "device": "DESKTOP",
             "date": "2026-03-22",
         },
     ]

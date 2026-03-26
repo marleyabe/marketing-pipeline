@@ -45,6 +45,7 @@ def initialize_schemas(conn: duckdb.DuckDBPyConnection) -> None:
             all_conversions DOUBLE,
             search_impression_share DOUBLE,
             quality_score INTEGER,
+            device VARCHAR,
             date DATE,
             _extracted_at TIMESTAMP DEFAULT current_timestamp,
             _source VARCHAR DEFAULT 'google_ads'
