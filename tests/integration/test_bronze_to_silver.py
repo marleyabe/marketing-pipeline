@@ -3,16 +3,28 @@ import os
 import pytest
 
 from src.db.schema import initialize_schemas
-from src.loaders.duckdb_loader import DuckDBBronzeLoader
+from src.loaders.postgres_loader import PostgresBronzeLoader
 from src.transformers.sql_runner import SQLRunner
 
 SQL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "sql")
 
 
+def _fetchone(conn, sql, params=None):
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return cur.fetchone()
+
+
+def _fetchall(conn, sql, params=None):
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return cur.fetchall()
+
+
 @pytest.fixture
 def setup_pipeline(memory_connection, sample_meta_ads_data, sample_google_ads_data):
     initialize_schemas(memory_connection)
-    loader = DuckDBBronzeLoader(memory_connection)
+    loader = PostgresBronzeLoader(memory_connection)
     loader.load(sample_meta_ads_data, "meta_ads_raw", source="meta_ads")
     loader.load(sample_google_ads_data, "google_ads_raw", source="google_ads")
 
@@ -24,20 +36,19 @@ def setup_pipeline(memory_connection, sample_meta_ads_data, sample_google_ads_da
 
 class TestBronzeToSilver:
     def test_silver_meta_ads_deduplicates(self, setup_pipeline):
-        conn = setup_pipeline
-        count = conn.execute("SELECT COUNT(*) FROM silver.meta_ads").fetchone()[0]
-        assert count == 2  # 2 unique ads
+        row = _fetchone(setup_pipeline, "SELECT COUNT(*) FROM silver.meta_ads")
+        assert row[0] == 2
 
     def test_silver_google_ads_spend_per_campaign(self, setup_pipeline):
-        conn = setup_pipeline
-        spend = conn.execute(
-            "SELECT spend FROM silver.google_ads WHERE campaign_id = 'g_camp_1'"
-        ).fetchone()[0]
-        assert spend == 150.0
+        row = _fetchone(
+            setup_pipeline,
+            "SELECT spend FROM silver.google_ads WHERE campaign_id = 'g_camp_1'",
+        )
+        assert row[0] == 150.0
 
     def test_silver_google_ads_aggregates_multiple_keywords_into_one_campaign_row(self, memory_connection):
         initialize_schemas(memory_connection)
-        loader = DuckDBBronzeLoader(memory_connection)
+        loader = PostgresBronzeLoader(memory_connection)
         loader.load([
             {
                 "customer_id": "789012", "customer_name": "Cliente B",
@@ -59,44 +70,39 @@ class TestBronzeToSilver:
 
         SQLRunner(memory_connection, SQL_DIR).run_silver()
 
-        rows = memory_connection.execute(
-            "SELECT impressions, clicks, spend, conversions FROM silver.google_ads WHERE campaign_id = 'gc1'"
-        ).fetchall()
+        rows = _fetchall(
+            memory_connection,
+            "SELECT impressions, clicks, spend, conversions FROM silver.google_ads WHERE campaign_id = 'gc1'",
+        )
 
         assert len(rows) == 1
-        assert rows[0][0] == 1500   # impressions: 1000 + 500
-        assert rows[0][1] == 60     # clicks: 40 + 20
-        assert rows[0][2] == 150.0  # spend: 100 + 50
-        assert rows[0][3] == 8.0    # conversions: 5 + 3
+        assert rows[0][0] == 1500
+        assert rows[0][1] == 60
+        assert rows[0][2] == 150.0
+        assert rows[0][3] == 8.0
 
     def test_silver_nulls_replaced_with_defaults(self, setup_pipeline):
-        conn = setup_pipeline
-        result = conn.execute(
-            "SELECT impressions, clicks, spend FROM silver.meta_ads"
-        ).fetchall()
-        for row in result:
-            assert row[0] >= 0  # impressions
-            assert row[1] >= 0  # clicks
-            assert row[2] >= 0.0  # spend
+        rows = _fetchall(
+            setup_pipeline,
+            "SELECT impressions, clicks, spend FROM silver.meta_ads",
+        )
+        for row in rows:
+            assert row[0] >= 0
+            assert row[1] >= 0
+            assert row[2] >= 0.0
 
     def test_silver_unified_merges_platforms(self, setup_pipeline):
-        conn = setup_pipeline
-        platforms = conn.execute(
-            "SELECT DISTINCT platform FROM silver.unified_campaigns ORDER BY platform"
-        ).fetchall()
+        platforms = _fetchall(
+            setup_pipeline,
+            "SELECT DISTINCT platform FROM silver.unified_campaigns ORDER BY platform",
+        )
         assert [p[0] for p in platforms] == ["google_ads", "meta_ads"]
 
     def test_silver_unified_row_count(self, setup_pipeline):
-        conn = setup_pipeline
-        count = conn.execute(
-            "SELECT COUNT(*) FROM silver.unified_campaigns"
-        ).fetchone()[0]
-        assert count == 4  # 2 meta + 2 google
+        row = _fetchone(setup_pipeline, "SELECT COUNT(*) FROM silver.unified_campaigns")
+        assert row[0] == 4
 
     def test_silver_standardizes_date(self, setup_pipeline):
-        conn = setup_pipeline
-        dates = conn.execute(
-            "SELECT DISTINCT date FROM silver.unified_campaigns"
-        ).fetchall()
+        dates = _fetchall(setup_pipeline, "SELECT DISTINCT date FROM silver.unified_campaigns")
         for row in dates:
             assert row[0] is not None

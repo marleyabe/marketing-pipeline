@@ -1,4 +1,5 @@
-CREATE OR REPLACE TABLE silver.unified_campaigns AS
+DROP TABLE IF EXISTS silver.unified_campaigns;
+CREATE TABLE silver.unified_campaigns AS
 SELECT
     account_id,
     account_name,

@@ -1,25 +1,41 @@
 import os
-import tempfile
+import uuid
 
-import duckdb
+import psycopg2
 import pytest
+
+_TEST_HOST = os.environ.get("TEST_POSTGRES_HOST", "localhost")
+_TEST_PORT = int(os.environ.get("TEST_POSTGRES_PORT", "5432"))
+_TEST_USER = os.environ.get("TEST_POSTGRES_USER", "pipeline")
+_TEST_PASSWORD = os.environ.get("TEST_POSTGRES_PASSWORD", "pipeline")
+
+_ADMIN_DSN = f"postgresql://{_TEST_USER}:{_TEST_PASSWORD}@{_TEST_HOST}:{_TEST_PORT}/postgres"
 
 
 @pytest.fixture
 def memory_connection():
-    """DuckDB in-memory connection for unit tests."""
-    conn = duckdb.connect(":memory:")
+    """Creates a fresh temporary PostgreSQL database for each test, drops it afterwards."""
+    db_name = f"test_{uuid.uuid4().hex[:12]}"
+
+    admin = psycopg2.connect(_ADMIN_DSN)
+    admin.autocommit = True
+    with admin.cursor() as cur:
+        cur.execute(f'CREATE DATABASE "{db_name}"')
+    admin.close()
+
+    dsn = f"postgresql://{_TEST_USER}:{_TEST_PASSWORD}@{_TEST_HOST}:{_TEST_PORT}/{db_name}"
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = False
+
     yield conn
+
     conn.close()
 
-
-@pytest.fixture
-def file_connection(tmp_path):
-    """DuckDB file-based connection for tests that need persistence."""
-    db_path = str(tmp_path / "test.duckdb")
-    conn = duckdb.connect(db_path)
-    yield conn, db_path
-    conn.close()
+    admin = psycopg2.connect(_ADMIN_DSN)
+    admin.autocommit = True
+    with admin.cursor() as cur:
+        cur.execute(f'DROP DATABASE "{db_name}"')
+    admin.close()
 
 
 @pytest.fixture

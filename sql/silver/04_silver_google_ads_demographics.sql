@@ -1,4 +1,5 @@
-CREATE OR REPLACE TABLE silver.google_ads_demographics AS
+DROP TABLE IF EXISTS silver.google_ads_demographics;
+CREATE TABLE silver.google_ads_demographics AS
 WITH deduplicated AS (
     SELECT
         customer_id,
@@ -32,8 +33,8 @@ SELECT
     CAST(dimension_value AS VARCHAR) AS dimension_value,
     SUM(COALESCE(impressions, 0))::BIGINT AS impressions,
     SUM(COALESCE(clicks, 0))::BIGINT AS clicks,
-    SUM(COALESCE(spend, 0.0))::DOUBLE AS spend,
-    SUM(COALESCE(conversions, 0.0))::DOUBLE AS conversions,
+    SUM(COALESCE(spend, 0.0))::DOUBLE PRECISION AS spend,
+    SUM(COALESCE(conversions, 0.0))::DOUBLE PRECISION AS conversions,
     CAST(date AS DATE) AS date,
     MAX(_extracted_at) AS _extracted_at
 FROM deduplicated

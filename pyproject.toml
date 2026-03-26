@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Marketing data pipeline for Meta Ads and Google Ads"
 requires-python = ">=3.11"
 dependencies = [
-    "duckdb>=1.2.0",
+    "psycopg2-binary>=2.9.0",
     "pandas>=2.0.0",
     "facebook-business>=24.0.0",
     "google-ads>=29.0.0",

@@ -1,4 +1,5 @@
-CREATE OR REPLACE TABLE gold.reports_weekly AS
+DROP TABLE IF EXISTS gold.reports_weekly;
+CREATE TABLE gold.reports_weekly AS
 SELECT
     account_id,
     account_name,

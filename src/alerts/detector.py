@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import date
 
-import duckdb
+import psycopg2.extensions
 
 # Thresholds globais
 SPEND_WARNING_PCT = -30
@@ -18,16 +18,18 @@ def _severity(change_pct: float, warning_threshold: float, critical_threshold: f
 
 
 class AlertDetector:
-    def __init__(self, connection: duckdb.DuckDBPyConnection):
+    def __init__(self, connection: psycopg2.extensions.connection):
         self._conn = connection
 
     def detect(self, check_date: date) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT account_id, account_name, date, spend, prev_spend, "
-            "conversions, prev_conversions, spend_change_pct, conversion_change_pct "
-            "FROM gold.alerts_daily WHERE date = ?",
-            [check_date],
-        ).fetchall()
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT account_id, account_name, date, spend, prev_spend, "
+                "conversions, prev_conversions, spend_change_pct, conversion_change_pct "
+                "FROM gold.alerts_daily WHERE date = %s",
+                [check_date],
+            )
+            rows = cur.fetchall()
 
         alerts = []
         for row in rows:
@@ -51,14 +53,16 @@ class AlertDetector:
                     "severity": sev,
                 }
                 alerts.append(alert)
-                self._conn.execute(
-                    "INSERT INTO gold.active_alerts "
-                    "(account_id, account_name, date, alert_type, metric_name, "
-                    "current_value, previous_value, change_pct, severity) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [account_id, account_name, row_date, "daily", "spend",
-                     row[3], row[4], spend_change, sev],
-                )
+                with self._conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO gold.active_alerts "
+                        "(account_id, account_name, date, alert_type, metric_name, "
+                        "current_value, previous_value, change_pct, severity) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        [account_id, account_name, row_date, "daily", "spend",
+                         row[3], row[4], spend_change, sev],
+                    )
+                self._conn.commit()
 
             # Check conversion drop
             sev = _severity(conv_change, CONVERSION_WARNING_PCT, CONVERSION_CRITICAL_PCT)
@@ -75,13 +79,15 @@ class AlertDetector:
                     "severity": sev,
                 }
                 alerts.append(alert)
-                self._conn.execute(
-                    "INSERT INTO gold.active_alerts "
-                    "(account_id, account_name, date, alert_type, metric_name, "
-                    "current_value, previous_value, change_pct, severity) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [account_id, account_name, row_date, "daily", "conversions",
-                     row[5], row[6], conv_change, sev],
-                )
+                with self._conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO gold.active_alerts "
+                        "(account_id, account_name, date, alert_type, metric_name, "
+                        "current_value, previous_value, change_pct, severity) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        [account_id, account_name, row_date, "daily", "conversions",
+                         row[5], row[6], conv_change, sev],
+                    )
+                self._conn.commit()
 
         return alerts

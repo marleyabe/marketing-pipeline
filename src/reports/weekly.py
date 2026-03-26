@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import date
 
-import duckdb
+import psycopg2.extensions
 
 
 WEEKLY_TEMPLATE = """📊 Relatório Semanal – {account_name}
@@ -14,16 +14,18 @@ WEEKLY_TEMPLATE = """📊 Relatório Semanal – {account_name}
 
 
 class WeeklyReportGenerator:
-    def __init__(self, connection: duckdb.DuckDBPyConnection):
+    def __init__(self, connection: psycopg2.extensions.connection):
         self._conn = connection
 
     def generate(self, report_date: date) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT account_id, account_name, period_start, period_end, "
-            "investimento, impressoes, cliques, conversoes, custo_por_conversao "
-            "FROM gold.reports_weekly WHERE week_start = DATE_TRUNC('week', ?::DATE)",
-            [report_date],
-        ).fetchall()
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT account_id, account_name, period_start, period_end, "
+                "investimento, impressoes, cliques, conversoes, custo_por_conversao "
+                "FROM gold.reports_weekly WHERE week_start = DATE_TRUNC('week', %s::DATE)",
+                [report_date],
+            )
+            rows = cur.fetchall()
 
         reports = []
         for row in rows:
@@ -46,11 +48,13 @@ class WeeklyReportGenerator:
             }
             reports.append(report)
 
-            self._conn.execute(
-                "INSERT INTO gold.generated_reports "
-                "(account_id, account_name, report_type, report_date, report_text) "
-                "VALUES (?, ?, ?, ?, ?)",
-                [row[0], row[1], "weekly", report_date, report_text],
-            )
+            with self._conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO gold.generated_reports "
+                    "(account_id, account_name, report_type, report_date, report_text) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    [row[0], row[1], "weekly", report_date, report_text],
+                )
+            self._conn.commit()
 
         return reports

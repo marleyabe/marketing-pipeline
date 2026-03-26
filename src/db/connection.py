@@ -1,14 +1,18 @@
 import time
-import duckdb
+
+import psycopg2
+import psycopg2.extensions
 
 
-def get_connection(path: str = ":memory:", retries: int = 10, delay: float = 3.0) -> duckdb.DuckDBPyConnection:
-    """Return a DuckDB connection to the given path, retrying on lock conflicts."""
+def get_connection(dsn: str = "", retries: int = 10, delay: float = 3.0) -> psycopg2.extensions.connection:
+    """Return a psycopg2 connection to the given DSN, retrying on transient errors."""
     for attempt in range(retries):
         try:
-            return duckdb.connect(path)
-        except duckdb.IOException as e:
-            if "lock" in str(e).lower() and attempt < retries - 1:
+            conn = psycopg2.connect(dsn)
+            conn.autocommit = False
+            return conn
+        except psycopg2.OperationalError:
+            if attempt < retries - 1:
                 time.sleep(delay)
             else:
                 raise

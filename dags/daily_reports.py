@@ -25,17 +25,19 @@ def daily_reports():
         logical_date = context.get("logical_date")
         report_date = logical_date.date() if logical_date else datetime.now().date()
 
-        conn = get_connection(os.environ.get("DUCKDB_PATH", "data/ads2u.duckdb"))
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS gold.generated_reports (
-                account_id VARCHAR,
-                account_name VARCHAR,
-                report_type VARCHAR,
-                report_date DATE,
-                report_text VARCHAR,
-                created_at TIMESTAMP DEFAULT current_timestamp
-            )
-        """)
+        conn = get_connection(os.environ["DATABASE_URL"])
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gold.generated_reports (
+                    account_id VARCHAR,
+                    account_name VARCHAR,
+                    report_type VARCHAR,
+                    report_date DATE,
+                    report_text VARCHAR,
+                    created_at TIMESTAMP DEFAULT current_timestamp
+                )
+            """)
+        conn.commit()
 
         generator = DailyReportGenerator(conn)
         reports = generator.generate(report_date)
@@ -56,17 +58,19 @@ def daily_reports():
         if report_date.weekday() != 6:
             return 0
 
-        conn = get_connection(os.environ.get("DUCKDB_PATH", "data/ads2u.duckdb"))
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS gold.generated_reports (
-                account_id VARCHAR,
-                account_name VARCHAR,
-                report_type VARCHAR,
-                report_date DATE,
-                report_text VARCHAR,
-                created_at TIMESTAMP DEFAULT current_timestamp
-            )
-        """)
+        conn = get_connection(os.environ["DATABASE_URL"])
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gold.generated_reports (
+                    account_id VARCHAR,
+                    account_name VARCHAR,
+                    report_type VARCHAR,
+                    report_date DATE,
+                    report_text VARCHAR,
+                    created_at TIMESTAMP DEFAULT current_timestamp
+                )
+            """)
+        conn.commit()
 
         generator = WeeklyReportGenerator(conn)
         reports = generator.generate(report_date)

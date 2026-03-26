@@ -1,4 +1,5 @@
-CREATE OR REPLACE TABLE silver.meta_ads AS
+DROP TABLE IF EXISTS silver.meta_ads;
+CREATE TABLE silver.meta_ads AS
 WITH deduplicated AS (
     SELECT
         account_id,
@@ -30,27 +31,25 @@ SELECT
     ad_name,
     COALESCE(impressions, 0)::BIGINT AS impressions,
     COALESCE(clicks, 0)::BIGINT AS clicks,
-    COALESCE(spend, 0.0)::DOUBLE AS spend,
+    COALESCE(spend, 0.0)::DOUBLE PRECISION AS spend,
     CAST(date_start AS DATE) AS date,
     CAST(device_platform AS VARCHAR) AS device_platform,
     CAST(publisher_platform AS VARCHAR) AS publisher_platform,
     COALESCE(
-        CASE
-            WHEN actions IS NOT NULL AND actions != '' AND actions != '[]'
-            THEN list_sum(
-                list_transform(
-                    list_filter(
-                        from_json(actions, '["json"]'),
-                        x -> json_extract_string(x, '$.action_type') NOT IN (
-                            'link_click', 'landing_page_view',
-                            'page_engagement', 'post_engagement'
-                        )
-                    ),
-                    x -> CAST(json_extract_string(x, '$.value') AS DOUBLE)
-                )
+        (
+            SELECT SUM((elem->>'value')::DOUBLE PRECISION)
+            FROM jsonb_array_elements(
+                CASE
+                    WHEN actions IS NOT NULL AND actions != '' AND actions != '[]'
+                    THEN actions::jsonb
+                    ELSE '[]'::jsonb
+                END
+            ) AS elem
+            WHERE (elem->>'action_type') NOT IN (
+                'link_click', 'landing_page_view',
+                'page_engagement', 'post_engagement'
             )
-            ELSE 0.0
-        END,
+        ),
         0.0
     ) AS conversions,
     CAST(actions AS VARCHAR) AS actions_raw,

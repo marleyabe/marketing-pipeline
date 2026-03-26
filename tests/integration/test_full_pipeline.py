@@ -7,7 +7,7 @@ import pytest
 
 from src.alerts.detector import AlertDetector
 from src.db.schema import initialize_schemas
-from src.loaders.duckdb_loader import DuckDBBronzeLoader
+from src.loaders.postgres_loader import PostgresBronzeLoader
 from src.reports.daily import DailyReportGenerator
 from src.reports.weekly import WeeklyReportGenerator
 from src.transformers.sql_runner import SQLRunner
@@ -15,81 +15,68 @@ from src.transformers.sql_runner import SQLRunner
 SQL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "sql")
 
 
+def _fetchone(conn, sql, params=None):
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return cur.fetchone()
+
+
+def _fetchall(conn, sql, params=None):
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return cur.fetchall()
+
+
+def _exec(conn, sql):
+    with conn.cursor() as cur:
+        cur.execute(sql)
+    conn.commit()
+
+
 @pytest.fixture
 def full_pipeline(memory_connection):
     """Load two days of data for both platforms and run full pipeline."""
     conn = memory_connection
     initialize_schemas(conn)
-    loader = DuckDBBronzeLoader(conn)
+    loader = PostgresBronzeLoader(conn)
 
-    # --- Day 1: 2026-03-21 (Saturday) ---
     meta_day1 = [
         {
-            "account_id": "act_100",
-            "account_name": "Cliente Alpha",
-            "campaign_id": "c1",
-            "campaign_name": "Camp Meta 1",
-            "ad_id": "a1",
-            "ad_name": "Ad 1",
-            "impressions": "5000",
-            "clicks": "200",
-            "spend": "500.00",
-            "date_start": "2026-03-21",
-            "date_stop": "2026-03-21",
+            "account_id": "act_100", "account_name": "Cliente Alpha",
+            "campaign_id": "c1", "campaign_name": "Camp Meta 1",
+            "ad_id": "a1", "ad_name": "Ad 1",
+            "impressions": "5000", "clicks": "200", "spend": "500.00",
+            "date_start": "2026-03-21", "date_stop": "2026-03-21",
             "actions": '[{"action_type": "purchase", "value": "20"}]',
         },
     ]
     google_day1 = [
         {
-            "customer_id": "g_200",
-            "customer_name": "Cliente Beta",
-            "campaign_id": "gc1",
-            "campaign_name": "Camp Google 1",
-            "ad_group_id": "ag_1",
-            "ad_group_name": "Grupo 1",
-            "keyword_id": "kw_1",
-            "keyword_text": "palavra chave 1",
-            "match_type": "BROAD",
-            "impressions": 3000,
-            "clicks": 150,
-            "spend": 300.0,
-            "conversions": 12.0,
+            "customer_id": "g_200", "customer_name": "Cliente Beta",
+            "campaign_id": "gc1", "campaign_name": "Camp Google 1",
+            "ad_group_id": "ag_1", "ad_group_name": "Grupo 1",
+            "keyword_id": "kw_1", "keyword_text": "palavra chave 1", "match_type": "BROAD",
+            "impressions": 3000, "clicks": 150, "spend": 300.0, "conversions": 12.0,
             "date": "2026-03-21",
         },
     ]
-
-    # --- Day 2: 2026-03-22 (Sunday) - Meta drops 60%, Google stable ---
     meta_day2 = [
         {
-            "account_id": "act_100",
-            "account_name": "Cliente Alpha",
-            "campaign_id": "c1",
-            "campaign_name": "Camp Meta 1",
-            "ad_id": "a1",
-            "ad_name": "Ad 1",
-            "impressions": "2000",
-            "clicks": "80",
-            "spend": "200.00",
-            "date_start": "2026-03-22",
-            "date_stop": "2026-03-22",
+            "account_id": "act_100", "account_name": "Cliente Alpha",
+            "campaign_id": "c1", "campaign_name": "Camp Meta 1",
+            "ad_id": "a1", "ad_name": "Ad 1",
+            "impressions": "2000", "clicks": "80", "spend": "200.00",
+            "date_start": "2026-03-22", "date_stop": "2026-03-22",
             "actions": '[{"action_type": "purchase", "value": "5"}]',
         },
     ]
     google_day2 = [
         {
-            "customer_id": "g_200",
-            "customer_name": "Cliente Beta",
-            "campaign_id": "gc1",
-            "campaign_name": "Camp Google 1",
-            "ad_group_id": "ag_1",
-            "ad_group_name": "Grupo 1",
-            "keyword_id": "kw_1",
-            "keyword_text": "palavra chave 1",
-            "match_type": "BROAD",
-            "impressions": 2800,
-            "clicks": 140,
-            "spend": 280.0,
-            "conversions": 11.0,
+            "customer_id": "g_200", "customer_name": "Cliente Beta",
+            "campaign_id": "gc1", "campaign_name": "Camp Google 1",
+            "ad_group_id": "ag_1", "ad_group_name": "Grupo 1",
+            "keyword_id": "kw_1", "keyword_text": "palavra chave 1", "match_type": "BROAD",
+            "impressions": 2800, "clicks": 140, "spend": 280.0, "conversions": 11.0,
             "date": "2026-03-22",
         },
     ]
@@ -99,31 +86,21 @@ def full_pipeline(memory_connection):
     loader.load(meta_day2, "meta_ads_raw", source="meta_ads")
     loader.load(google_day2, "google_ads_raw", source="google_ads")
 
-    # Run all SQL transforms (silver + gold)
     SQLRunner(conn, SQL_DIR).run_all()
 
-    # Create output tables
-    conn.execute("""
+    _exec(conn, """
         CREATE TABLE IF NOT EXISTS gold.generated_reports (
-            account_id VARCHAR,
-            account_name VARCHAR,
-            report_type VARCHAR,
-            report_date DATE,
-            report_text VARCHAR,
+            account_id VARCHAR, account_name VARCHAR, report_type VARCHAR,
+            report_date DATE, report_text VARCHAR,
             created_at TIMESTAMP DEFAULT current_timestamp
         )
     """)
-    conn.execute("""
+    _exec(conn, """
         CREATE TABLE IF NOT EXISTS gold.active_alerts (
-            account_id VARCHAR,
-            account_name VARCHAR,
-            date DATE,
-            alert_type VARCHAR,
-            metric_name VARCHAR,
-            current_value DOUBLE,
-            previous_value DOUBLE,
-            change_pct DOUBLE,
-            severity VARCHAR,
+            account_id VARCHAR, account_name VARCHAR, date DATE,
+            alert_type VARCHAR, metric_name VARCHAR,
+            current_value DOUBLE PRECISION, previous_value DOUBLE PRECISION,
+            change_pct DOUBLE PRECISION, severity VARCHAR,
             created_at TIMESTAMP DEFAULT current_timestamp
         )
     """)
@@ -132,136 +109,103 @@ def full_pipeline(memory_connection):
 
 
 class TestFullPipelineE2E:
-    """Verify full data flow from bronze to reports and alerts."""
-
-    # --- Bronze layer ---
 
     def test_bronze_has_both_platforms(self, full_pipeline):
-        conn = full_pipeline
-        meta_count = conn.execute(
-            "SELECT COUNT(*) FROM bronze.meta_ads_raw"
-        ).fetchone()[0]
-        google_count = conn.execute(
-            "SELECT COUNT(*) FROM bronze.google_ads_raw"
-        ).fetchone()[0]
-        assert meta_count == 2  # 2 days
-        assert google_count == 2
-
-    # --- Silver layer ---
+        meta = _fetchone(full_pipeline, "SELECT COUNT(*) FROM bronze.meta_ads_raw")
+        google = _fetchone(full_pipeline, "SELECT COUNT(*) FROM bronze.google_ads_raw")
+        assert meta[0] == 2
+        assert google[0] == 2
 
     def test_silver_unified_has_both_platforms(self, full_pipeline):
-        conn = full_pipeline
-        platforms = conn.execute(
-            "SELECT DISTINCT platform FROM silver.unified_campaigns ORDER BY platform"
-        ).fetchall()
+        platforms = _fetchall(
+            full_pipeline,
+            "SELECT DISTINCT platform FROM silver.unified_campaigns ORDER BY platform",
+        )
         assert [p[0] for p in platforms] == ["google_ads", "meta_ads"]
 
     def test_silver_unified_has_all_rows(self, full_pipeline):
-        conn = full_pipeline
-        count = conn.execute(
-            "SELECT COUNT(*) FROM silver.unified_campaigns"
-        ).fetchone()[0]
-        assert count == 4  # 2 meta + 2 google
-
-    # --- Gold layer ---
+        row = _fetchone(full_pipeline, "SELECT COUNT(*) FROM silver.unified_campaigns")
+        assert row[0] == 4
 
     def test_gold_daily_performance_exists(self, full_pipeline):
-        conn = full_pipeline
-        count = conn.execute(
-            "SELECT COUNT(*) FROM gold.daily_performance"
-        ).fetchone()[0]
-        assert count == 4  # 2 accounts x 2 days
+        row = _fetchone(full_pipeline, "SELECT COUNT(*) FROM gold.daily_performance")
+        assert row[0] == 4
 
     def test_gold_daily_performance_meta_day2(self, full_pipeline):
-        conn = full_pipeline
-        row = conn.execute(
+        row = _fetchone(
+            full_pipeline,
             "SELECT impressions, clicks, spend, conversions "
             "FROM gold.daily_performance "
-            "WHERE account_id = 'act_100' AND date = '2026-03-22'"
-        ).fetchone()
+            "WHERE account_id = 'act_100' AND date = '2026-03-22'",
+        )
         assert row[0] == 2000
         assert row[1] == 80
         assert row[2] == 200.0
         assert row[3] == 5.0
 
     def test_gold_reports_daily_has_portuguese_columns(self, full_pipeline):
-        conn = full_pipeline
-        columns = conn.execute(
+        cols = _fetchall(
+            full_pipeline,
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_schema = 'gold' AND table_name = 'reports_daily' "
-            "ORDER BY ordinal_position"
-        ).fetchall()
-        names = [c[0] for c in columns]
+            "ORDER BY ordinal_position",
+        )
+        names = [c[0] for c in cols]
         for expected in ["investimento", "impressoes", "cliques", "conversoes"]:
             assert expected in names
 
     def test_gold_alerts_daily_detects_spend_drop(self, full_pipeline):
-        conn = full_pipeline
-        row = conn.execute(
+        row = _fetchone(
+            full_pipeline,
             "SELECT spend_change_pct FROM gold.alerts_daily "
-            "WHERE account_id = 'act_100' AND date = '2026-03-22'"
-        ).fetchone()
+            "WHERE account_id = 'act_100' AND date = '2026-03-22'",
+        )
         assert row is not None
-        assert row[0] == -60.0  # 200/500 - 1 = -60%
-
-    # --- Daily reports ---
+        assert row[0] == -60.0
 
     def test_daily_report_generated_for_each_account(self, full_pipeline):
-        conn = full_pipeline
-        generator = DailyReportGenerator(conn)
+        generator = DailyReportGenerator(full_pipeline)
         reports = generator.generate(date(2026, 3, 22))
-        assert len(reports) == 2  # Meta + Google accounts
+        assert len(reports) == 2
 
     def test_daily_report_contains_account_name(self, full_pipeline):
-        conn = full_pipeline
-        generator = DailyReportGenerator(conn)
+        generator = DailyReportGenerator(full_pipeline)
         reports = generator.generate(date(2026, 3, 22))
         texts = [r["report_text"] for r in reports]
         assert any("Cliente Alpha" in t for t in texts)
         assert any("Cliente Beta" in t for t in texts)
 
     def test_daily_report_stored_in_gold(self, full_pipeline):
-        conn = full_pipeline
-        DailyReportGenerator(conn).generate(date(2026, 3, 22))
-        count = conn.execute(
-            "SELECT COUNT(*) FROM gold.generated_reports WHERE report_type = 'daily'"
-        ).fetchone()[0]
-        assert count == 2
-
-    # --- Alerts ---
+        DailyReportGenerator(full_pipeline).generate(date(2026, 3, 22))
+        row = _fetchone(
+            full_pipeline,
+            "SELECT COUNT(*) FROM gold.generated_reports WHERE report_type = 'daily'",
+        )
+        assert row[0] == 2
 
     def test_alert_detector_finds_critical_spend_drop(self, full_pipeline):
-        conn = full_pipeline
-        detector = AlertDetector(conn)
+        detector = AlertDetector(full_pipeline)
         alerts = detector.detect(date(2026, 3, 22))
         spend_alerts = [a for a in alerts if a["metric_name"] == "spend"]
-        # act_100 had -60% spend drop → critical
         meta_alert = [a for a in spend_alerts if a["account_id"] == "act_100"]
         assert len(meta_alert) == 1
         assert meta_alert[0]["severity"] == "critical"
 
     def test_alert_detector_finds_conversion_drop(self, full_pipeline):
-        conn = full_pipeline
-        detector = AlertDetector(conn)
+        detector = AlertDetector(full_pipeline)
         alerts = detector.detect(date(2026, 3, 22))
         conv_alerts = [a for a in alerts if a["metric_name"] == "conversions"]
-        # act_100: 5 vs 20 = -75% → critical
         meta_conv = [a for a in conv_alerts if a["account_id"] == "act_100"]
         assert len(meta_conv) == 1
         assert meta_conv[0]["severity"] == "critical"
 
     def test_no_alert_for_stable_account(self, full_pipeline):
-        conn = full_pipeline
-        detector = AlertDetector(conn)
+        detector = AlertDetector(full_pipeline)
         alerts = detector.detect(date(2026, 3, 22))
-        # g_200: spend -6.7%, conversions -8.3% → within threshold
         google_alerts = [a for a in alerts if a["account_id"] == "g_200"]
         assert len(google_alerts) == 0
 
     def test_alerts_stored_in_active_alerts(self, full_pipeline):
-        conn = full_pipeline
-        AlertDetector(conn).detect(date(2026, 3, 22))
-        count = conn.execute(
-            "SELECT COUNT(*) FROM gold.active_alerts"
-        ).fetchone()[0]
-        assert count > 0
+        AlertDetector(full_pipeline).detect(date(2026, 3, 22))
+        row = _fetchone(full_pipeline, "SELECT COUNT(*) FROM gold.active_alerts")
+        assert row[0] > 0

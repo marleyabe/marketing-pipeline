@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import date
 
-import duckdb
+import psycopg2.extensions
 
 
 DAILY_TEMPLATE = """**{account_name}**
@@ -14,16 +14,18 @@ DAILY_TEMPLATE = """**{account_name}**
 
 
 class DailyReportGenerator:
-    def __init__(self, connection: duckdb.DuckDBPyConnection):
+    def __init__(self, connection: psycopg2.extensions.connection):
         self._conn = connection
 
     def generate(self, report_date: date) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT account_id, account_name, date, investimento, impressoes, "
-            "cliques, conversoes, custo_por_conversao, taxa_de_conversao "
-            "FROM gold.reports_daily WHERE date = ?",
-            [report_date],
-        ).fetchall()
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT account_id, account_name, date, investimento, impressoes, "
+                "cliques, conversoes, custo_por_conversao, taxa_de_conversao "
+                "FROM gold.reports_daily WHERE date = %s",
+                [report_date],
+            )
+            rows = cur.fetchall()
 
         reports = []
         for row in rows:
@@ -46,11 +48,13 @@ class DailyReportGenerator:
             }
             reports.append(report)
 
-            self._conn.execute(
-                "INSERT INTO gold.generated_reports "
-                "(account_id, account_name, report_type, report_date, report_text) "
-                "VALUES (?, ?, ?, ?, ?)",
-                [row[0], row[1], "daily", report_date, report_text],
-            )
+            with self._conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO gold.generated_reports "
+                    "(account_id, account_name, report_type, report_date, report_text) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    [row[0], row[1], "daily", report_date, report_text],
+                )
+            self._conn.commit()
 
         return reports

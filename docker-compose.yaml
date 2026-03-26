@@ -11,7 +11,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-change-me-in-production}
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_SECRET_KEY:-change-me-in-production}
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution
-    DUCKDB_PATH: /opt/pipeline/data/ads2u.duckdb
+    DATABASE_URL: postgresql://pipeline:${PIPELINE_DB_PASSWORD:-pipeline}@postgres/marketing_pipeline
     # Meta Ads
     META_APP_ID: ${META_APP_ID:-}
     META_APP_SECRET: ${META_APP_SECRET:-}
@@ -23,7 +23,6 @@ x-airflow-common: &airflow-common
     GOOGLE_REFRESH_TOKEN: ${GOOGLE_REFRESH_TOKEN:-}
     GOOGLE_LOGIN_CUSTOMER_ID: ${GOOGLE_LOGIN_CUSTOMER_ID:-}
   volumes:
-    - ./data:/opt/pipeline/data
     - ./dags:/opt/airflow/dags
     - ./src:/opt/pipeline/src
     - ./sql:/opt/pipeline/sql
@@ -40,6 +39,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -67,6 +68,9 @@ services:
     command:
       - -c
       - |
+        PGPASSWORD=airflow psql -h postgres -U airflow -c "CREATE DATABASE marketing_pipeline;" || true
+        PGPASSWORD=airflow psql -h postgres -U airflow -c "CREATE USER pipeline WITH PASSWORD '${PIPELINE_DB_PASSWORD:-pipeline}';" || true
+        PGPASSWORD=airflow psql -h postgres -U airflow -c "GRANT ALL PRIVILEGES ON DATABASE marketing_pipeline TO pipeline;" || true
         airflow db migrate
         python -c "
         from sqlalchemy import create_engine, text

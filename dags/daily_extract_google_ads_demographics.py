@@ -49,11 +49,11 @@ def daily_extract_google_ads_demographics():
     def load(batches: list[list[dict]]) -> None:
         from src.db.connection import get_connection
         from src.db.schema import initialize_schemas
-        from src.loaders.duckdb_loader import DuckDBBronzeLoader
+        from src.loaders.postgres_loader import PostgresBronzeLoader
 
-        conn = get_connection(os.environ.get("DUCKDB_PATH", "data/ads2u.duckdb"))
+        conn = get_connection(os.environ["DATABASE_URL"])
         initialize_schemas(conn)
-        loader = DuckDBBronzeLoader(conn)
+        loader = PostgresBronzeLoader(conn)
 
         for batch in batches:
             loader.load(batch, "google_ads_demographics_raw", source="google_ads")

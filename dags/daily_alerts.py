@@ -25,21 +25,23 @@ def daily_alerts():
         logical_date = context.get("logical_date")
         check_date = logical_date.date() if logical_date else datetime.now().date()
 
-        conn = get_connection(os.environ.get("DUCKDB_PATH", "data/ads2u.duckdb"))
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS gold.active_alerts (
-                account_id VARCHAR,
-                account_name VARCHAR,
-                date DATE,
-                alert_type VARCHAR,
-                metric_name VARCHAR,
-                current_value DOUBLE,
-                previous_value DOUBLE,
-                change_pct DOUBLE,
-                severity VARCHAR,
-                created_at TIMESTAMP DEFAULT current_timestamp
-            )
-        """)
+        conn = get_connection(os.environ["DATABASE_URL"])
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gold.active_alerts (
+                    account_id VARCHAR,
+                    account_name VARCHAR,
+                    date DATE,
+                    alert_type VARCHAR,
+                    metric_name VARCHAR,
+                    current_value DOUBLE PRECISION,
+                    previous_value DOUBLE PRECISION,
+                    change_pct DOUBLE PRECISION,
+                    severity VARCHAR,
+                    created_at TIMESTAMP DEFAULT current_timestamp
+                )
+            """)
+        conn.commit()
 
         detector = AlertDetector(conn)
         alerts = detector.detect(check_date)

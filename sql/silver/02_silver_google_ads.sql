@@ -1,4 +1,5 @@
-CREATE OR REPLACE TABLE silver.google_ads AS
+DROP TABLE IF EXISTS silver.google_ads;
+CREATE TABLE silver.google_ads AS
 WITH deduplicated AS (
     SELECT
         customer_id,
@@ -33,13 +34,13 @@ SELECT
     CAST(device AS VARCHAR) AS device,
     SUM(COALESCE(impressions, 0))::BIGINT AS impressions,
     SUM(COALESCE(clicks, 0))::BIGINT AS clicks,
-    SUM(COALESCE(spend, 0.0))::DOUBLE AS spend,
+    SUM(COALESCE(spend, 0.0))::DOUBLE PRECISION AS spend,
     CAST(date AS DATE) AS date,
-    SUM(COALESCE(conversions, 0.0))::DOUBLE AS conversions,
-    SUM(COALESCE(view_through_conversions, 0.0))::DOUBLE AS view_through_conversions,
-    SUM(COALESCE(all_conversions, 0.0))::DOUBLE AS all_conversions,
-    AVG(search_impression_share)::DOUBLE AS search_impression_share,
-    AVG(quality_score)::DOUBLE AS quality_score,
+    SUM(COALESCE(conversions, 0.0))::DOUBLE PRECISION AS conversions,
+    SUM(COALESCE(view_through_conversions, 0.0))::DOUBLE PRECISION AS view_through_conversions,
+    SUM(COALESCE(all_conversions, 0.0))::DOUBLE PRECISION AS all_conversions,
+    AVG(search_impression_share)::DOUBLE PRECISION AS search_impression_share,
+    AVG(quality_score)::DOUBLE PRECISION AS quality_score,
     NULL::VARCHAR AS actions_raw,
     MAX(_extracted_at) AS _extracted_at,
     'google_ads' AS platform

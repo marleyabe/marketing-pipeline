@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from src.db.schema import initialize_schemas
@@ -12,6 +10,12 @@ def runner(memory_connection, tmp_path):
     return SQLRunner(memory_connection, str(tmp_path))
 
 
+def _fetchone(conn, sql):
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        return cur.fetchone()
+
+
 class TestSQLRunner:
     def test_executes_sql_from_file(self, runner, memory_connection, tmp_path):
         sql_dir = tmp_path / "silver"
@@ -22,15 +26,12 @@ class TestSQLRunner:
 
         runner.run_silver()
 
-        result = memory_connection.execute(
-            "SELECT val FROM silver.test_view"
-        ).fetchone()
+        result = _fetchone(memory_connection, "SELECT val FROM silver.test_view")
         assert result[0] == 1
 
     def test_executes_in_alphabetical_order(self, runner, memory_connection, tmp_path):
         sql_dir = tmp_path / "silver"
         sql_dir.mkdir()
-        # b.sql runs first, creates table; a.sql would fail if it ran first
         (sql_dir / "01_first.sql").write_text(
             "CREATE OR REPLACE VIEW silver.step1 AS SELECT 1 AS step"
         )
@@ -40,9 +41,7 @@ class TestSQLRunner:
 
         runner.run_silver()
 
-        result = memory_connection.execute(
-            "SELECT step FROM silver.step2"
-        ).fetchone()
+        result = _fetchone(memory_connection, "SELECT step FROM silver.step2")
         assert result[0] == 2
 
     def test_run_all_executes_silver_then_gold(self, runner, memory_connection, tmp_path):
@@ -60,9 +59,7 @@ class TestSQLRunner:
 
         runner.run_all()
 
-        result = memory_connection.execute(
-            "SELECT val FROM gold.agg"
-        ).fetchone()
+        result = _fetchone(memory_connection, "SELECT val FROM gold.agg")
         assert result[0] == 20
 
     def test_is_idempotent(self, runner, memory_connection, tmp_path):
@@ -73,11 +70,9 @@ class TestSQLRunner:
         )
 
         runner.run_silver()
-        runner.run_silver()  # second run should not error
+        runner.run_silver()
 
-        result = memory_connection.execute(
-            "SELECT val FROM silver.idem"
-        ).fetchone()
+        result = _fetchone(memory_connection, "SELECT val FROM silver.idem")
         assert result[0] == 1
 
     def test_handles_sql_error(self, runner, tmp_path):

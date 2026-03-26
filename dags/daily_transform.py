@@ -22,7 +22,7 @@ def daily_transform():
         from src.db.connection import get_connection
         from src.transformers.sql_runner import SQLRunner
 
-        conn = get_connection(os.environ.get("DUCKDB_PATH", "data/ads2u.duckdb"))
+        conn = get_connection(os.environ["DATABASE_URL"])
         SQLRunner(conn, SQL_DIR).run_silver()
         conn.close()
 
@@ -31,7 +31,7 @@ def daily_transform():
         from src.db.connection import get_connection
         from src.transformers.sql_runner import SQLRunner
 
-        conn = get_connection(os.environ.get("DUCKDB_PATH", "data/ads2u.duckdb"))
+        conn = get_connection(os.environ["DATABASE_URL"])
         SQLRunner(conn, SQL_DIR).run_gold()
         conn.close()
 

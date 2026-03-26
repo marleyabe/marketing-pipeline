@@ -1,11 +1,10 @@
-import os
 from pathlib import Path
 
-import duckdb
+import psycopg2.extensions
 
 
 class SQLRunner:
-    def __init__(self, connection: duckdb.DuckDBPyConnection, sql_dir: str):
+    def __init__(self, connection: psycopg2.extensions.connection, sql_dir: str):
         self._conn = connection
         self._sql_dir = Path(sql_dir)
 
@@ -18,7 +17,9 @@ class SQLRunner:
         sql_files = sorted(folder_path.glob("*.sql"))
         for sql_file in sql_files:
             sql = sql_file.read_text()
-            self._conn.execute(sql)
+            with self._conn.cursor() as cur:
+                cur.execute(sql)
+            self._conn.commit()
 
     def run_silver(self) -> None:
         self._run_folder("silver")

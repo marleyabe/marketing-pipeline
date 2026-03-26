@@ -11,10 +11,6 @@ build/
 venv/
 env/
 
-# DuckDB
-data/*.duckdb
-data/*.duckdb.wal
-
 # Environment
 .env
 

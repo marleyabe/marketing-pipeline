@@ -1,11 +1,12 @@
-CREATE OR REPLACE TABLE gold.alerts_daily AS
+DROP TABLE IF EXISTS gold.alerts_daily;
+CREATE TABLE gold.alerts_daily AS
 WITH current_day AS (
     SELECT * FROM gold.daily_performance
 ),
 previous_day AS (
     SELECT
         account_id,
-        date + INTERVAL 1 DAY AS next_date,
+        date + INTERVAL '1 day' AS next_date,
         spend AS prev_spend,
         conversions AS prev_conversions
     FROM gold.daily_performance
@@ -20,11 +21,11 @@ SELECT
     c.conversions,
     p.prev_conversions,
     CASE WHEN p.prev_spend > 0
-        THEN ROUND(((c.spend - p.prev_spend) / p.prev_spend) * 100, 2)
+        THEN ROUND(((c.spend - p.prev_spend) / p.prev_spend * 100)::NUMERIC, 2)
         ELSE 0.0
     END AS spend_change_pct,
     CASE WHEN p.prev_conversions > 0
-        THEN ROUND(((c.conversions - p.prev_conversions) / p.prev_conversions) * 100, 2)
+        THEN ROUND(((c.conversions - p.prev_conversions) / p.prev_conversions * 100)::NUMERIC, 2)
         ELSE 0.0
     END AS conversion_change_pct
 FROM current_day c

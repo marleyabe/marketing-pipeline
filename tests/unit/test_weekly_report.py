@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 
 from src.db.schema import initialize_schemas
-from src.loaders.duckdb_loader import DuckDBBronzeLoader
+from src.loaders.postgres_loader import PostgresBronzeLoader
 from src.reports.weekly import WeeklyReportGenerator
 from src.transformers.sql_runner import SQLRunner
 
@@ -14,21 +14,23 @@ SQL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "sql")
 @pytest.fixture
 def setup(memory_connection, sample_meta_ads_data, sample_google_ads_data):
     initialize_schemas(memory_connection)
-    loader = DuckDBBronzeLoader(memory_connection)
+    loader = PostgresBronzeLoader(memory_connection)
     loader.load(sample_meta_ads_data, "meta_ads_raw", source="meta_ads")
     loader.load(sample_google_ads_data, "google_ads_raw", source="google_ads")
     SQLRunner(memory_connection, SQL_DIR).run_all()
 
-    memory_connection.execute("""
-        CREATE TABLE IF NOT EXISTS gold.generated_reports (
-            account_id VARCHAR,
-            account_name VARCHAR,
-            report_type VARCHAR,
-            report_date DATE,
-            report_text VARCHAR,
-            generated_at TIMESTAMP DEFAULT current_timestamp
-        )
-    """)
+    with memory_connection.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gold.generated_reports (
+                account_id VARCHAR,
+                account_name VARCHAR,
+                report_type VARCHAR,
+                report_date DATE,
+                report_text VARCHAR,
+                generated_at TIMESTAMP DEFAULT current_timestamp
+            )
+        """)
+    memory_connection.commit()
     return memory_connection
 
 
@@ -52,7 +54,7 @@ class TestWeeklyReportGenerator:
         gen = WeeklyReportGenerator(setup)
         gen.generate(date(2026, 3, 22))
 
-        count = setup.execute(
-            "SELECT COUNT(*) FROM gold.generated_reports WHERE report_type = 'weekly'"
-        ).fetchone()[0]
+        with setup.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM gold.generated_reports WHERE report_type = 'weekly'")
+            count = cur.fetchone()[0]
         assert count == 2
