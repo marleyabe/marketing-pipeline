@@ -2,10 +2,13 @@
 import sys
 from unittest.mock import MagicMock
 
+_current_dag_tasks: dict = {}
+
 
 class _MockDag:
-    def __init__(self, schedule):
+    def __init__(self, schedule, task_dict=None):
         self.schedule = schedule
+        self.task_dict = task_dict or {}
 
 
 def _dag(**kwargs):
@@ -13,8 +16,10 @@ def _dag(**kwargs):
 
     def decorator(fn):
         def wrapper(*args, **kw):
+            global _current_dag_tasks
+            _current_dag_tasks = {}
             fn(*args, **kw)
-            return _MockDag(schedule)
+            return _MockDag(schedule, task_dict=dict(_current_dag_tasks))
 
         return wrapper
 
@@ -32,12 +37,23 @@ class _MockTaskInstance:
 
 
 class _MockTask:
-    """Wraps a function decorated with @task."""
+    """Wraps a function decorated with @task.
 
-    def __init__(self, fn):
+    Supports both bare ``@task`` and parameterised ``@task(retries=3)`` usage.
+    """
+
+    def __init__(self, fn=None, *, retries=0, retry_delay=None, **kwargs):
         self._fn = fn
+        self.retries = retries
+        self.retry_delay = retry_delay
+        if fn is not None:
+            self.task_id = fn.__name__
+            _current_dag_tasks[fn.__name__] = self
 
     def __call__(self, *args, **kwargs):
+        # @task(retries=3)(fn) — second call wraps the function
+        if self._fn is None and len(args) == 1 and callable(args[0]):
+            return _MockTask(args[0], retries=self.retries, retry_delay=self.retry_delay)
         return _MockTaskInstance()
 
     def expand(self, **kwargs):

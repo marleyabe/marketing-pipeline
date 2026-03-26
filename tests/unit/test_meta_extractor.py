@@ -110,15 +110,15 @@ class TestExtract:
 
     @patch("src.extractors.meta_ads.FacebookAdsApi")
     @patch("src.extractors.meta_ads.AdAccount")
-    def test_handles_api_error_gracefully(self, mock_adaccount_cls, mock_api_cls, extractor):
+    def test_propagates_api_error(self, mock_adaccount_cls, mock_api_cls, extractor):
         mock_api_cls.init.return_value = MagicMock()
 
         mock_account = MagicMock()
         mock_account.get_insights.side_effect = Exception("API Error")
         mock_adaccount_cls.return_value = mock_account
 
-        results = extractor.extract(["act_123"], date="2026-03-22")
-        assert results == []
+        with pytest.raises(Exception, match="API Error"):
+            extractor.extract(["act_123"], date="2026-03-22")
 
     @patch("src.extractors.meta_ads.FacebookAdsApi")
     @patch("src.extractors.meta_ads.AdAccount")

@@ -71,3 +71,23 @@ class TestDagProperties:
     def test_backfill_google_has_no_schedule(self):
         mod = importlib.import_module("backfill_google_ads")
         assert mod.dag.schedule is None
+
+
+class TestExtractTaskRetries:
+    @pytest.fixture(autouse=True)
+    def _setup_path(self):
+        dags_dir = os.path.join(os.path.dirname(__file__), "..", "..", "dags")
+        sys.path.insert(0, dags_dir)
+        yield
+        sys.path.pop(0)
+
+    @pytest.mark.parametrize("dag_module", [
+        "daily_extract_meta_ads",
+        "daily_extract_google_ads",
+        "daily_extract_meta_ads_demographics",
+        "daily_extract_google_ads_demographics",
+    ])
+    def test_extract_account_has_3_retries(self, dag_module):
+        mod = importlib.import_module(dag_module)
+        task = mod.dag.task_dict["extract_account"]
+        assert task.retries == 3

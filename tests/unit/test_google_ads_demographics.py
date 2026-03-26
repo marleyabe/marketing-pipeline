@@ -225,22 +225,12 @@ class TestExtractDemographics:
         assert types.count("income_range") == 1
 
     @patch("src.extractors.google_ads.GoogleAdsClient")
-    def test_error_in_one_account_does_not_stop_others(self, mock_client_cls, extractor):
+    def test_propagates_api_error(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
         mock_service = MagicMock()
         mock_client.get_service.return_value = mock_service
-        # first account fails all 3 queries, second succeeds
-        mock_service.search.side_effect = [
-            Exception("API Error"),
-            Exception("API Error"),
-            Exception("API Error"),
-            [_make_gender_row(customer_id=222222)],
-            [],
-            [],
-        ]
+        mock_service.search.side_effect = Exception("API Error")
 
-        results = extractor.extract_demographics(["111111", "222222"], date="2026-03-22")
-
-        assert len(results) == 1
-        assert results[0]["customer_id"] == "222222"
+        with pytest.raises(Exception, match="API Error"):
+            extractor.extract_demographics(["111111"], date="2026-03-22")

@@ -215,15 +215,15 @@ class TestExtractKeywords:
         assert results[1]["device"] == "TABLET"
 
     @patch("src.extractors.google_ads.GoogleAdsClient")
-    def test_handles_api_error_per_account(self, mock_client_cls, extractor):
+    def test_propagates_api_error(self, mock_client_cls, extractor):
         mock_client = MagicMock()
         mock_client_cls.load_from_dict.return_value = mock_client
         mock_service = MagicMock()
         mock_client.get_service.return_value = mock_service
         mock_service.search.side_effect = Exception("API Error")
 
-        results = extractor.extract(["111111"], date="2026-03-22")
-        assert results == []
+        with pytest.raises(Exception, match="API Error"):
+            extractor.extract(["111111"], date="2026-03-22")
 
     @patch("src.extractors.google_ads.GoogleAdsClient")
     def test_handles_empty_response(self, mock_client_cls, extractor):
@@ -250,17 +250,3 @@ class TestExtractKeywords:
         results = extractor.extract(["111111", "222222"], date="2026-03-22")
         assert len(results) == 2
 
-    @patch("src.extractors.google_ads.GoogleAdsClient")
-    def test_error_in_one_account_does_not_stop_others(self, mock_client_cls, extractor):
-        mock_client = MagicMock()
-        mock_client_cls.load_from_dict.return_value = mock_client
-        mock_service = MagicMock()
-        mock_client.get_service.return_value = mock_service
-        mock_service.search.side_effect = [
-            Exception("API Error"),
-            [_make_keyword_row(customer_id=222222)],
-        ]
-
-        results = extractor.extract(["111111", "222222"], date="2026-03-22")
-        assert len(results) == 1
-        assert results[0]["customer_id"] == "222222"

@@ -1,10 +1,6 @@
-import logging
-
 from google.ads.googleads.client import GoogleAdsClient
 
 from src.extractors.base import BaseExtractor
-
-logger = logging.getLogger(__name__)
 
 GENDER_QUERY = """
     SELECT
@@ -139,34 +135,31 @@ class GoogleAdsExtractor(BaseExtractor):
         results = []
 
         for customer_id in account_ids:
-            try:
-                query = KEYWORD_PERFORMANCE_QUERY.format(date=date)
-                rows = service.search(customer_id=customer_id, query=query)
+            query = KEYWORD_PERFORMANCE_QUERY.format(date=date)
+            rows = service.search(customer_id=customer_id, query=query)
 
-                for row in rows:
-                    results.append({
-                        "customer_id": str(row.customer.id),
-                        "customer_name": row.customer.descriptive_name,
-                        "campaign_id": str(row.campaign.id),
-                        "campaign_name": row.campaign.name,
-                        "ad_group_id": str(row.ad_group.id),
-                        "ad_group_name": row.ad_group.name,
-                        "keyword_id": str(row.ad_group_criterion.criterion_id),
-                        "keyword_text": row.ad_group_criterion.keyword.text,
-                        "match_type": row.ad_group_criterion.keyword.match_type.name,
-                        "impressions": row.metrics.impressions,
-                        "clicks": row.metrics.clicks,
-                        "spend": row.metrics.cost_micros / 1_000_000,
-                        "conversions": row.metrics.conversions,
-                        "view_through_conversions": row.metrics.view_through_conversions,
-                        "all_conversions": row.metrics.all_conversions,
-                        "search_impression_share": row.metrics.search_impression_share,
-                        "quality_score": row.ad_group_criterion.quality_info.quality_score,
-                        "device": row.segments.device.name,
-                        "date": row.segments.date,
-                    })
-            except Exception:
-                logger.exception("Error extracting data for customer %s", customer_id)
+            for row in rows:
+                results.append({
+                    "customer_id": str(row.customer.id),
+                    "customer_name": row.customer.descriptive_name,
+                    "campaign_id": str(row.campaign.id),
+                    "campaign_name": row.campaign.name,
+                    "ad_group_id": str(row.ad_group.id),
+                    "ad_group_name": row.ad_group.name,
+                    "keyword_id": str(row.ad_group_criterion.criterion_id),
+                    "keyword_text": row.ad_group_criterion.keyword.text,
+                    "match_type": row.ad_group_criterion.keyword.match_type.name,
+                    "impressions": row.metrics.impressions,
+                    "clicks": row.metrics.clicks,
+                    "spend": row.metrics.cost_micros / 1_000_000,
+                    "conversions": row.metrics.conversions,
+                    "view_through_conversions": row.metrics.view_through_conversions,
+                    "all_conversions": row.metrics.all_conversions,
+                    "search_impression_share": row.metrics.search_impression_share,
+                    "quality_score": row.ad_group_criterion.quality_info.quality_score,
+                    "device": row.segments.device.name,
+                    "date": row.segments.date,
+                })
 
         return results
 
@@ -183,29 +176,23 @@ class GoogleAdsExtractor(BaseExtractor):
 
         for customer_id in account_ids:
             for query_template, dimension_type, get_value in demographic_queries:
-                try:
-                    query = query_template.format(date=date)
-                    rows = service.search(customer_id=customer_id, query=query)
-                    for row in rows:
-                        results.append({
-                            "customer_id": str(row.customer.id),
-                            "customer_name": row.customer.descriptive_name,
-                            "campaign_id": str(row.campaign.id),
-                            "campaign_name": row.campaign.name,
-                            "ad_group_id": str(row.ad_group.id),
-                            "ad_group_name": row.ad_group.name,
-                            "dimension_type": dimension_type,
-                            "dimension_value": get_value(row),
-                            "impressions": row.metrics.impressions,
-                            "clicks": row.metrics.clicks,
-                            "spend": row.metrics.cost_micros / 1_000_000,
-                            "conversions": row.metrics.conversions,
-                            "date": row.segments.date,
-                        })
-                except Exception:
-                    logger.exception(
-                        "Error extracting %s demographics for customer %s",
-                        dimension_type, customer_id,
-                    )
+                query = query_template.format(date=date)
+                rows = service.search(customer_id=customer_id, query=query)
+                for row in rows:
+                    results.append({
+                        "customer_id": str(row.customer.id),
+                        "customer_name": row.customer.descriptive_name,
+                        "campaign_id": str(row.campaign.id),
+                        "campaign_name": row.campaign.name,
+                        "ad_group_id": str(row.ad_group.id),
+                        "ad_group_name": row.ad_group.name,
+                        "dimension_type": dimension_type,
+                        "dimension_value": get_value(row),
+                        "impressions": row.metrics.impressions,
+                        "clicks": row.metrics.clicks,
+                        "spend": row.metrics.cost_micros / 1_000_000,
+                        "conversions": row.metrics.conversions,
+                        "date": row.segments.date,
+                    })
 
         return results

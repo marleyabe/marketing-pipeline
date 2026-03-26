@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task
 
@@ -26,7 +26,7 @@ def daily_extract_meta_ads():
         })
         return extractor.list_accounts()
 
-    @task
+    @task(retries=3, retry_delay=timedelta(minutes=5))
     def extract_account(account: dict) -> list[dict]:
         from airflow.sdk import get_current_context
         from src.extractors.meta_ads import MetaAdsExtractor

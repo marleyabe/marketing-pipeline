@@ -120,35 +120,15 @@ class TestExtractDemographics:
 
     @patch("src.extractors.meta_ads.FacebookAdsApi")
     @patch("src.extractors.meta_ads.AdAccount")
-    def test_handles_error_gracefully(self, mock_adaccount_cls, mock_api_cls, extractor):
+    def test_propagates_api_error(self, mock_adaccount_cls, mock_api_cls, extractor):
         mock_api_cls.init.return_value = MagicMock()
 
         mock_account = MagicMock()
         mock_account.get_insights.side_effect = Exception("API Error")
         mock_adaccount_cls.return_value = mock_account
 
-        results = extractor.extract_demographics(["act_123"], date="2026-03-26")
-        assert results == []
-
-    @patch("src.extractors.meta_ads.FacebookAdsApi")
-    @patch("src.extractors.meta_ads.AdAccount")
-    def test_error_in_one_account_does_not_stop_others(self, mock_adaccount_cls, mock_api_cls, extractor):
-        mock_api_cls.init.return_value = MagicMock()
-
-        failing_account = MagicMock()
-        failing_account.get_insights.side_effect = Exception("API Error")
-
-        success_account = MagicMock()
-        success_account.get_insights.return_value = [
-            _make_demographics_insight(account_id="act_456", ad_id="ad_2")
-        ]
-
-        mock_adaccount_cls.side_effect = [failing_account, success_account]
-
-        results = extractor.extract_demographics(["111111", "222222"], date="2026-03-26")
-
-        assert len(results) == 1
-        assert results[0]["account_id"] == "act_456"
+        with pytest.raises(Exception, match="API Error"):
+            extractor.extract_demographics(["act_123"], date="2026-03-26")
 
     @patch("src.extractors.meta_ads.FacebookAdsApi")
     @patch("src.extractors.meta_ads.AdAccount")
