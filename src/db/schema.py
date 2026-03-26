@@ -51,3 +51,23 @@ def initialize_schemas(conn: duckdb.DuckDBPyConnection) -> None:
             _source VARCHAR DEFAULT 'google_ads'
         )
     """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bronze.google_ads_demographics_raw (
+            customer_id VARCHAR,
+            customer_name VARCHAR,
+            campaign_id VARCHAR,
+            campaign_name VARCHAR,
+            ad_group_id VARCHAR,
+            ad_group_name VARCHAR,
+            dimension_type VARCHAR,
+            dimension_value VARCHAR,
+            impressions BIGINT,
+            clicks BIGINT,
+            spend DOUBLE,
+            conversions DOUBLE,
+            date DATE,
+            _extracted_at TIMESTAMP DEFAULT current_timestamp,
+            _source VARCHAR DEFAULT 'google_ads'
+        )
+    """)

@@ -6,6 +6,63 @@ from src.extractors.base import BaseExtractor
 
 logger = logging.getLogger(__name__)
 
+GENDER_QUERY = """
+    SELECT
+        customer.id,
+        customer.descriptive_name,
+        campaign.id,
+        campaign.name,
+        ad_group.id,
+        ad_group.name,
+        ad_group_criterion.gender.type,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        segments.date
+    FROM gender_view
+    WHERE segments.date = '{date}'
+      AND ad_group_criterion.status != 'REMOVED'
+"""
+
+AGE_RANGE_QUERY = """
+    SELECT
+        customer.id,
+        customer.descriptive_name,
+        campaign.id,
+        campaign.name,
+        ad_group.id,
+        ad_group.name,
+        ad_group_criterion.age_range.type,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        segments.date
+    FROM age_range_view
+    WHERE segments.date = '{date}'
+      AND ad_group_criterion.status != 'REMOVED'
+"""
+
+INCOME_RANGE_QUERY = """
+    SELECT
+        customer.id,
+        customer.descriptive_name,
+        campaign.id,
+        campaign.name,
+        ad_group.id,
+        ad_group.name,
+        ad_group_criterion.income_range.type,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        segments.date
+    FROM income_range_view
+    WHERE segments.date = '{date}'
+      AND ad_group_criterion.status != 'REMOVED'
+"""
+
 KEYWORD_PERFORMANCE_QUERY = """
     SELECT
         customer.id,
@@ -110,5 +167,45 @@ class GoogleAdsExtractor(BaseExtractor):
                     })
             except Exception:
                 logger.exception("Error extracting data for customer %s", customer_id)
+
+        return results
+
+    def extract_demographics(self, account_ids: list[str], date: str) -> list[dict]:
+        client = self._get_client()
+        service = client.get_service("GoogleAdsService")
+        results = []
+
+        demographic_queries = [
+            (GENDER_QUERY, "gender", lambda row: row.ad_group_criterion.gender.type_.name),
+            (AGE_RANGE_QUERY, "age_range", lambda row: row.ad_group_criterion.age_range.type_.name),
+            (INCOME_RANGE_QUERY, "income_range", lambda row: row.ad_group_criterion.income_range.type_.name),
+        ]
+
+        for customer_id in account_ids:
+            for query_template, dimension_type, get_value in demographic_queries:
+                try:
+                    query = query_template.format(date=date)
+                    rows = service.search(customer_id=customer_id, query=query)
+                    for row in rows:
+                        results.append({
+                            "customer_id": str(row.customer.id),
+                            "customer_name": row.customer.descriptive_name,
+                            "campaign_id": str(row.campaign.id),
+                            "campaign_name": row.campaign.name,
+                            "ad_group_id": str(row.ad_group.id),
+                            "ad_group_name": row.ad_group.name,
+                            "dimension_type": dimension_type,
+                            "dimension_value": get_value(row),
+                            "impressions": row.metrics.impressions,
+                            "clicks": row.metrics.clicks,
+                            "spend": row.metrics.cost_micros / 1_000_000,
+                            "conversions": row.metrics.conversions,
+                            "date": row.segments.date,
+                        })
+                except Exception:
+                    logger.exception(
+                        "Error extracting %s demographics for customer %s",
+                        dimension_type, customer_id,
+                    )
 
         return results
