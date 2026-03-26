@@ -3,6 +3,8 @@ from datetime import datetime
 
 from airflow.sdk import dag, task
 
+from callbacks.discord_alert import send_discord_alert
+
 DAG_ID = "daily_transform"
 
 SQL_DIR = os.environ.get("SQL_DIR", "/opt/pipeline/sql")
@@ -14,6 +16,7 @@ SQL_DIR = os.environ.get("SQL_DIR", "/opt/pipeline/sql")
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["transform"],
+    on_failure_callback=send_discord_alert,
 )
 def daily_transform():
 

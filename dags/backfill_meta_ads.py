@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task
 
+from callbacks.discord_alert import send_discord_alert
+
 DAG_ID = "backfill_meta_ads"
 
 
@@ -13,6 +15,7 @@ DAG_ID = "backfill_meta_ads"
     catchup=False,
     tags=["backfill", "meta"],
     params={"days_back": 30},
+    on_failure_callback=send_discord_alert,
 )
 def backfill_meta_ads():
 

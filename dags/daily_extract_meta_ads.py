@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task
 
+from callbacks.discord_alert import send_discord_alert
+
 DAG_ID = "daily_extract_meta_ads"
 
 
@@ -12,6 +14,7 @@ DAG_ID = "daily_extract_meta_ads"
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["extract", "meta"],
+    on_failure_callback=send_discord_alert,
 )
 def daily_extract_meta_ads():
 

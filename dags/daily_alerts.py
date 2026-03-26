@@ -3,6 +3,8 @@ from datetime import datetime
 
 from airflow.sdk import dag, task
 
+from callbacks.discord_alert import send_discord_alert
+
 DAG_ID = "daily_alerts"
 
 
@@ -12,6 +14,7 @@ DAG_ID = "daily_alerts"
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["alerts"],
+    on_failure_callback=send_discord_alert,
 )
 def daily_alerts():
 
