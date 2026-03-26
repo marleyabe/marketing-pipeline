@@ -62,6 +62,7 @@ class MetaAdsExtractor(BaseExtractor):
                     params={
                         "level": "ad",
                         "time_range": {"since": date, "until": date},
+                        "breakdowns": ["device_platform", "publisher_platform"],
                     },
                 )
                 for insight in insights:
@@ -82,8 +83,52 @@ class MetaAdsExtractor(BaseExtractor):
                         "date_start": data.get("date_start", ""),
                         "date_stop": data.get("date_stop", ""),
                         "actions": actions,
+                        "device_platform": data.get("device_platform", ""),
+                        "publisher_platform": data.get("publisher_platform", ""),
                     })
             except Exception:
                 logger.exception("Error extracting Meta Ads for account %s", account_id)
+
+        return results
+
+    def extract_demographics(self, account_ids: list[str], date: str) -> list[dict]:
+        self._init_api()
+        results = []
+
+        for account_id in account_ids:
+            try:
+                act_id = account_id if account_id.startswith("act_") else f"act_{account_id}"
+                account = AdAccount(act_id)
+                insights = account.get_insights(
+                    fields=INSIGHT_FIELDS,
+                    params={
+                        "level": "ad",
+                        "time_range": {"since": date, "until": date},
+                        "breakdowns": ["age", "gender"],
+                    },
+                )
+                for insight in insights:
+                    data = insight.export_all_data()
+                    actions = data.get("actions", [])
+                    if isinstance(actions, list):
+                        actions = json.dumps(actions)
+                    results.append({
+                        "account_id": data.get("account_id", ""),
+                        "account_name": data.get("account_name", ""),
+                        "campaign_id": data.get("campaign_id", ""),
+                        "campaign_name": data.get("campaign_name", ""),
+                        "ad_id": data.get("ad_id", ""),
+                        "ad_name": data.get("ad_name", ""),
+                        "age": data.get("age", ""),
+                        "gender": data.get("gender", ""),
+                        "impressions": int(data.get("impressions", 0)),
+                        "clicks": int(data.get("clicks", 0)),
+                        "spend": float(data.get("spend", 0.0)),
+                        "date_start": data.get("date_start", ""),
+                        "date_stop": data.get("date_stop", ""),
+                        "actions": actions,
+                    })
+            except Exception:
+                logger.exception("Error extracting Meta Ads demographics for account %s", account_id)
 
         return results

@@ -1,4 +1,4 @@
-CREATE OR REPLACE TABLE silver.meta_ads AS
+CREATE OR REPLACE TABLE silver.meta_ads_demographics AS
 WITH deduplicated AS (
     SELECT
         account_id,
@@ -7,33 +7,32 @@ WITH deduplicated AS (
         campaign_name,
         ad_id,
         ad_name,
+        age,
+        gender,
         impressions,
         clicks,
         spend,
-        date_start,
         actions,
-        device_platform,
-        publisher_platform,
+        date_start,
         _extracted_at,
         ROW_NUMBER() OVER (
-            PARTITION BY account_id, ad_id, device_platform, publisher_platform, CAST(date_start AS VARCHAR)
+            PARTITION BY account_id, ad_id, age, gender, CAST(date_start AS VARCHAR)
             ORDER BY _extracted_at DESC
         ) AS rn
-    FROM bronze.meta_ads_raw
+    FROM bronze.meta_ads_demographics_raw
 )
 SELECT
     CAST(account_id AS VARCHAR) AS account_id,
     CAST(account_name AS VARCHAR) AS account_name,
     CAST(campaign_id AS VARCHAR) AS campaign_id,
     CAST(campaign_name AS VARCHAR) AS campaign_name,
-    ad_id,
-    ad_name,
-    COALESCE(impressions, 0)::BIGINT AS impressions,
-    COALESCE(clicks, 0)::BIGINT AS clicks,
-    COALESCE(spend, 0.0)::DOUBLE AS spend,
-    CAST(date_start AS DATE) AS date,
-    CAST(device_platform AS VARCHAR) AS device_platform,
-    CAST(publisher_platform AS VARCHAR) AS publisher_platform,
+    CAST(ad_id AS VARCHAR) AS ad_id,
+    CAST(ad_name AS VARCHAR) AS ad_name,
+    CAST(age AS VARCHAR) AS age,
+    CAST(gender AS VARCHAR) AS gender,
+    SUM(COALESCE(impressions, 0))::BIGINT AS impressions,
+    SUM(COALESCE(clicks, 0))::BIGINT AS clicks,
+    SUM(COALESCE(spend, 0.0))::DOUBLE AS spend,
     COALESCE(
         CASE
             WHEN actions IS NOT NULL AND actions != '' AND actions != '[]'
@@ -53,8 +52,8 @@ SELECT
         END,
         0.0
     ) AS conversions,
-    CAST(actions AS VARCHAR) AS actions_raw,
-    _extracted_at,
-    'meta_ads' AS platform
+    CAST(date_start AS DATE) AS date,
+    MAX(_extracted_at) AS _extracted_at
 FROM deduplicated
-WHERE rn = 1;
+WHERE rn = 1
+GROUP BY account_id, account_name, campaign_id, campaign_name, ad_id, ad_name, age, gender, date_start, actions;

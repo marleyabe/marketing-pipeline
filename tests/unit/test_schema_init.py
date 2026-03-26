@@ -89,6 +89,42 @@ class TestInitializeSchemas:
         assert "_extracted_at" in column_names
         assert "_source" in column_names
 
+    def test_creates_bronze_meta_ads_demographics_table(self, memory_connection):
+        initialize_schemas(memory_connection)
+
+        columns = memory_connection.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'bronze' AND table_name = 'meta_ads_demographics_raw' "
+            "ORDER BY ordinal_position"
+        ).fetchall()
+        column_names = [c[0] for c in columns]
+
+        assert "account_id" in column_names
+        assert "campaign_id" in column_names
+        assert "ad_id" in column_names
+        assert "age" in column_names
+        assert "gender" in column_names
+        assert "impressions" in column_names
+        assert "clicks" in column_names
+        assert "spend" in column_names
+        assert "actions" in column_names
+        assert "date_start" in column_names
+        assert "_extracted_at" in column_names
+        assert "_source" in column_names
+
+    def test_meta_ads_raw_has_device_and_placement_columns(self, memory_connection):
+        initialize_schemas(memory_connection)
+
+        columns = memory_connection.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'bronze' AND table_name = 'meta_ads_raw' "
+            "ORDER BY ordinal_position"
+        ).fetchall()
+        column_names = [c[0] for c in columns]
+
+        assert "device_platform" in column_names
+        assert "publisher_platform" in column_names
+
     def test_is_idempotent(self, memory_connection):
         initialize_schemas(memory_connection)
         initialize_schemas(memory_connection)

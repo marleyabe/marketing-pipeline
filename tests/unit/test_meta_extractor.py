@@ -104,6 +104,7 @@ class TestExtract:
             "account_id", "account_name", "campaign_id", "campaign_name",
             "ad_id", "ad_name", "impressions", "clicks", "spend",
             "date_start", "date_stop", "actions",
+            "device_platform", "publisher_platform",
         }
         assert set(row.keys()) == expected_keys
 
@@ -162,3 +163,52 @@ class TestExtract:
         assert isinstance(row["impressions"], int)
         assert isinstance(row["clicks"], int)
         assert isinstance(row["spend"], float)
+
+    @patch("src.extractors.meta_ads.FacebookAdsApi")
+    @patch("src.extractors.meta_ads.AdAccount")
+    def test_maps_device_platform_correctly(self, mock_adaccount_cls, mock_api_cls, extractor):
+        mock_api_cls.init.return_value = MagicMock()
+
+        mock_insight = MagicMock()
+        mock_insight.export_all_data.return_value = {
+            "account_id": "act_123",
+            "account_name": "Cliente A",
+            "campaign_id": "camp_1",
+            "campaign_name": "Campanha 1",
+            "ad_id": "ad_1",
+            "ad_name": "Anuncio 1",
+            "impressions": "500",
+            "clicks": "20",
+            "spend": "50.00",
+            "date_start": "2026-03-26",
+            "date_stop": "2026-03-26",
+            "actions": [],
+            "device_platform": "mobile_web",
+            "publisher_platform": "facebook",
+        }
+
+        mock_account = MagicMock()
+        mock_account.get_insights.return_value = [mock_insight]
+        mock_adaccount_cls.return_value = mock_account
+
+        results = extractor.extract(["act_123"], date="2026-03-26")
+        row = results[0]
+
+        assert row["device_platform"] == "mobile_web"
+        assert row["publisher_platform"] == "facebook"
+
+    @patch("src.extractors.meta_ads.FacebookAdsApi")
+    @patch("src.extractors.meta_ads.AdAccount")
+    def test_passes_device_breakdowns_to_api(self, mock_adaccount_cls, mock_api_cls, extractor):
+        mock_api_cls.init.return_value = MagicMock()
+
+        mock_account = MagicMock()
+        mock_account.get_insights.return_value = []
+        mock_adaccount_cls.return_value = mock_account
+
+        extractor.extract(["act_123"], date="2026-03-26")
+
+        call_kwargs = mock_account.get_insights.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs.args[1]
+        assert "device_platform" in params["breakdowns"]
+        assert "publisher_platform" in params["breakdowns"]

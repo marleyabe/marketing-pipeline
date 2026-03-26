@@ -21,6 +21,29 @@ def initialize_schemas(conn: duckdb.DuckDBPyConnection) -> None:
             date_start DATE,
             date_stop DATE,
             actions VARCHAR,
+            device_platform VARCHAR,
+            publisher_platform VARCHAR,
+            _extracted_at TIMESTAMP DEFAULT current_timestamp,
+            _source VARCHAR DEFAULT 'meta_ads'
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bronze.meta_ads_demographics_raw (
+            account_id VARCHAR,
+            account_name VARCHAR,
+            campaign_id VARCHAR,
+            campaign_name VARCHAR,
+            ad_id VARCHAR,
+            ad_name VARCHAR,
+            age VARCHAR,
+            gender VARCHAR,
+            impressions BIGINT,
+            clicks BIGINT,
+            spend DOUBLE,
+            date_start DATE,
+            date_stop DATE,
+            actions VARCHAR,
             _extracted_at TIMESTAMP DEFAULT current_timestamp,
             _source VARCHAR DEFAULT 'meta_ads'
         )

@@ -11,11 +11,14 @@
 **3. Dados históricos (backfill)** ✅
 - DAGs `backfill_meta_ads` e `backfill_google_ads` com trigger manual e param `days_back` (30/90/180). Cada conta itera os dias e retorna uma linha por dia por anúncio/keyword
 
-**4. Google Ads — mais métricas**
+**4. Google Ads — mais métricas** ✅
 - `view_through_conversions`, `all_conversions`, `search_impression_share`, `quality_score` por keyword
+- `segments.device` (MOBILE, DESKTOP, TABLET, CONNECTED_TV, OTHER) por keyword
+- Demographics separados em `bronze.google_ads_demographics_raw`: gender, age_range, income_range via DAG `daily_extract_google_ads_demographics`
 
-**5. Meta Ads — breakdown por dispositivo e posicionamento**
-- Separar dados por `device_platform` (mobile/desktop) e `publisher_platform` (feed, stories, reels)
+**5. Meta Ads — breakdown por dispositivo e posicionamento** ✅
+- `device_platform` e `publisher_platform` adicionados ao extract principal via `breakdowns` da API
+- Demographics separados em `bronze.meta_ads_demographics_raw`: age e gender via DAG `daily_extract_meta_ads_demographics`
 
 ---
 

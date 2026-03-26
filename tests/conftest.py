@@ -39,6 +39,8 @@ def sample_meta_ads_data():
             "date_start": "2026-03-22",
             "date_stop": "2026-03-22",
             "actions": '[{"action_type": "link_click", "value": "50"}, {"action_type": "onsite_conversion.messaging_conversation_started_7d", "value": "10"}]',
+            "device_platform": "mobile_web",
+            "publisher_platform": "facebook",
         },
         {
             "account_id": "act_123",
@@ -53,6 +55,8 @@ def sample_meta_ads_data():
             "date_start": "2026-03-22",
             "date_stop": "2026-03-22",
             "actions": '[{"action_type": "link_click", "value": "80"}, {"action_type": "offsite_conversion.fb_pixel_purchase", "value": "5"}]',
+            "device_platform": "desktop",
+            "publisher_platform": "instagram",
         },
     ]
 
