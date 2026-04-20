@@ -1,44 +1,44 @@
+"""dbt silver + gold via Cosmos. Trigger por Datasets dos extractors."""
+
 import os
 from datetime import datetime
+from pathlib import Path
 
-from airflow.sdk import dag, task
+from airflow.decorators import dag
+from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-from callbacks.discord_alert import send_discord_alert
+from dags.google_ads import bronze_google_dataset
+from dags.meta_ads import bronze_meta_dataset
 
-DAG_ID = "daily_transform"
+DBT_ROOT = Path(os.environ.get("DBT_PROJECT_DIR", "/opt/airflow/dbt_project"))
 
-SQL_DIR = os.environ.get("SQL_DIR", "/opt/pipeline/sql")
+profile_config = ProfileConfig(
+    profile_name="ads2u",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="postgres_marketing",
+        profile_args={"schema": "public"},
+    ),
+)
 
 
 @dag(
-    dag_id=DAG_ID,
-    schedule="@daily",
-    start_date=datetime(2024, 1, 1),
+    dag_id="daily_transform",
+    schedule=[bronze_google_dataset, bronze_meta_dataset],
+    start_date=datetime(2026, 1, 1),
     catchup=False,
-    tags=["transform"],
-    on_failure_callback=send_discord_alert,
+    tags=["daily", "transform", "dbt"],
 )
 def daily_transform():
-
-    @task
-    def run_silver():
-        from src.db.connection import get_connection
-        from src.transformers.sql_runner import SQLRunner
-
-        conn = get_connection(os.environ["DATABASE_URL"])
-        SQLRunner(conn, SQL_DIR).run_silver()
-        conn.close()
-
-    @task
-    def run_gold():
-        from src.db.connection import get_connection
-        from src.transformers.sql_runner import SQLRunner
-
-        conn = get_connection(os.environ["DATABASE_URL"])
-        SQLRunner(conn, SQL_DIR).run_gold()
-        conn.close()
-
-    run_silver() >> run_gold()
+    DbtTaskGroup(
+        group_id="transform",
+        project_config=ProjectConfig(str(DBT_ROOT)),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(
+            dbt_executable_path="/home/airflow/.local/bin/dbt"
+        ),
+    )
 
 
-dag = daily_transform()
+daily_transform()

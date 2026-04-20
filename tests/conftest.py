@@ -1,126 +1,56 @@
 import os
-import uuid
+from unittest.mock import MagicMock
 
-import psycopg2
 import pytest
 
-_TEST_HOST = os.environ.get("TEST_POSTGRES_HOST", "localhost")
-_TEST_PORT = int(os.environ.get("TEST_POSTGRES_PORT", "5432"))
-_TEST_USER = os.environ.get("TEST_POSTGRES_USER", "pipeline")
-_TEST_PASSWORD = os.environ.get("TEST_POSTGRES_PASSWORD", "pipeline")
-
-_ADMIN_DSN = f"postgresql://{_TEST_USER}:{_TEST_PASSWORD}@{_TEST_HOST}:{_TEST_PORT}/postgres"
+os.environ.setdefault("API_KEY_PEPPER", "test-pepper")
 
 
-@pytest.fixture
-def memory_connection():
-    """Creates a fresh temporary PostgreSQL database for each test, drops it afterwards."""
-    db_name = f"test_{uuid.uuid4().hex[:12]}"
+class FakeCursor:
+    def __init__(self, rows_queue):
+        self._rows_queue = rows_queue
+        self._current: list = []
 
-    admin = psycopg2.connect(_ADMIN_DSN)
-    admin.autocommit = True
-    with admin.cursor() as cur:
-        cur.execute(f'CREATE DATABASE "{db_name}"')
-    admin.close()
+    def __enter__(self):
+        return self
 
-    dsn = f"postgresql://{_TEST_USER}:{_TEST_PASSWORD}@{_TEST_HOST}:{_TEST_PORT}/{db_name}"
-    conn = psycopg2.connect(dsn)
-    conn.autocommit = False
+    def __exit__(self, *args):
+        return False
 
-    yield conn
+    def execute(self, query, parameters=None):
+        self._current = self._rows_queue.pop(0) if self._rows_queue else []
 
-    conn.close()
+    def fetchone(self):
+        return self._current[0] if self._current else None
 
-    admin = psycopg2.connect(_ADMIN_DSN)
-    admin.autocommit = True
-    with admin.cursor() as cur:
-        cur.execute(f'DROP DATABASE "{db_name}"')
-    admin.close()
+    def fetchall(self):
+        return list(self._current)
 
 
-@pytest.fixture
-def sample_meta_ads_data():
-    """Sample raw data mimicking Meta Ads API response."""
-    return [
-        {
-            "account_id": "act_123",
-            "account_name": "Cliente A",
-            "campaign_id": "camp_1",
-            "campaign_name": "Campanha 1",
-            "ad_id": "ad_1",
-            "ad_name": "Anuncio 1",
-            "impressions": "1000",
-            "clicks": "50",
-            "spend": "100.50",
-            "date_start": "2026-03-22",
-            "date_stop": "2026-03-22",
-            "actions": '[{"action_type": "link_click", "value": "50"}, {"action_type": "onsite_conversion.messaging_conversation_started_7d", "value": "10"}]',
-            "device_platform": "mobile_web",
-            "publisher_platform": "facebook",
-        },
-        {
-            "account_id": "act_123",
-            "account_name": "Cliente A",
-            "campaign_id": "camp_2",
-            "campaign_name": "Campanha 2",
-            "ad_id": "ad_2",
-            "ad_name": "Anuncio 2",
-            "impressions": "2000",
-            "clicks": "80",
-            "spend": "200.00",
-            "date_start": "2026-03-22",
-            "date_stop": "2026-03-22",
-            "actions": '[{"action_type": "link_click", "value": "80"}, {"action_type": "offsite_conversion.fb_pixel_purchase", "value": "5"}]',
-            "device_platform": "desktop",
-            "publisher_platform": "instagram",
-        },
-    ]
+class FakeConn:
+    def __init__(self, rows_queue: list[list]):
+        self.rows_queue = rows_queue
+        self.autocommit = True
+
+    def cursor(self):
+        return FakeCursor(self.rows_queue)
+
+    def close(self):
+        pass
 
 
 @pytest.fixture
-def sample_google_ads_data():
-    """Sample raw data mimicking Google Ads Keywords API response."""
-    return [
-        {
-            "customer_id": "789012",
-            "customer_name": "Cliente B",
-            "campaign_id": "g_camp_1",
-            "campaign_name": "Google Campanha 1",
-            "ad_group_id": "ag_1",
-            "ad_group_name": "Grupo de Anúncios 1",
-            "keyword_id": "kw_1",
-            "keyword_text": "palavra chave 1",
-            "match_type": "BROAD",
-            "impressions": 1500,
-            "clicks": 60,
-            "spend": 150.0,
-            "conversions": 8.0,
-            "view_through_conversions": 1.0,
-            "all_conversions": 10.0,
-            "search_impression_share": 0.85,
-            "quality_score": 7,
-            "device": "MOBILE",
-            "date": "2026-03-22",
-        },
-        {
-            "customer_id": "789012",
-            "customer_name": "Cliente B",
-            "campaign_id": "g_camp_2",
-            "campaign_name": "Google Campanha 2",
-            "ad_group_id": "ag_2",
-            "ad_group_name": "Grupo de Anúncios 2",
-            "keyword_id": "kw_2",
-            "keyword_text": "palavra chave 2",
-            "match_type": "EXACT",
-            "impressions": 3000,
-            "clicks": 120,
-            "spend": 300.0,
-            "conversions": 15.0,
-            "view_through_conversions": 2.0,
-            "all_conversions": 18.0,
-            "search_impression_share": 0.92,
-            "quality_score": 9,
-            "device": "DESKTOP",
-            "date": "2026-03-22",
-        },
-    ]
+def fake_conn():
+    def _make(rows_queue: list[list]) -> FakeConn:
+        return FakeConn(rows_queue)
+
+    return _make
+
+
+@pytest.fixture
+def mock_request():
+    request = MagicMock()
+    request.method = "GET"
+    request.url.path = "/test"
+    request.client.host = "127.0.0.1"
+    return request

@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: daily_performance
+    description: "Gold — métricas diárias por account + platform com derivadas (ctr/cpc/conv)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [account_id, date, platform]
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads', 'meta_ads']
+      - name: impressions
+        tests: [not_null]
+      - name: spend
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+  - name: weekly_performance
+    description: "Gold — agregação semanal por account + platform."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [account_id, week_start, platform]
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: week_start
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads', 'meta_ads']
+      - name: spend
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"

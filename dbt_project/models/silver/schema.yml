@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: google_ads
+    description: "Silver — google ads dedup + agregação por device/dia."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: campaign_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads']
+      - name: impressions
+        tests: [not_null]
+      - name: clicks
+        tests: [not_null]
+      - name: spend
+        tests: [not_null]
+
+  - name: meta_ads
+    description: "Silver — meta ads dedup por (account, ad, device, publisher, date)."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: ad_id
+        tests: [not_null]
+      - name: campaign_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['meta_ads']
+      - name: impressions
+        tests: [not_null]
+      - name: clicks
+        tests: [not_null]
+      - name: spend
+        tests: [not_null]
+
+  - name: unified_campaigns
+    description: "Silver — unificação google + meta por campaign/dia."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: campaign_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads', 'meta_ads']

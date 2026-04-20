@@ -24,3 +24,23 @@ logs/
 # Coverage
 htmlcov/
 .coverage
+
+# Local data
+data/*.duckdb*
+data/*.sqlite*
+data/*.db*
+data/backups/
+.prefect/
+
+# dbt
+dbt_project/target/
+dbt_project/logs/
+dbt_project/dbt_packages/
+dbt_project/.user.yml
+
+.ai-jail
+
+# mutmut
+mutants/
+.mutmut-cache
+mutants.sqlite3
