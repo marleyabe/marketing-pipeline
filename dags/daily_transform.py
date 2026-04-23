@@ -4,12 +4,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from airflow.datasets import Dataset
 from airflow.decorators import dag
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-from dags.google_ads import bronze_google_dataset
-from dags.meta_ads import bronze_meta_dataset
+bronze_google_dataset = Dataset("ads2u/bronze/google_ads")
+bronze_meta_dataset = Dataset("ads2u/bronze/meta_ads")
 
 DBT_ROOT = Path(os.environ.get("DBT_PROJECT_DIR", "/opt/airflow/dbt_project"))
 

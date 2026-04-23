@@ -64,20 +64,18 @@ def _get_client() -> GoogleAdsClient:
     return GoogleAdsClient.load_from_dict({**_credentials(), "use_proto_plus": True})
 
 
-def _list_accounts() -> list[str]:
-    connection = get_pg()
-    init_schemas(connection)
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT account_id FROM ops.managed_accounts "
-                "WHERE platform = %s AND enabled = 1",
-                [PLATFORM],
-            )
-            rows = cursor.fetchall()
-    finally:
-        connection.close()
-    return [row[0] for row in rows]
+def _list_accounts(client: GoogleAdsClient) -> list[str]:
+    manager_id = os.environ["GOOGLE_LOGIN_CUSTOMER_ID"].replace("-", "")
+    service = client.get_service("GoogleAdsService")
+    query = """
+        SELECT customer_client.id
+        FROM customer_client
+        WHERE customer_client.status = 'ENABLED'
+          AND customer_client.manager = FALSE
+          AND customer_client.hidden = FALSE
+    """
+    rows = service.search(customer_id=manager_id, query=query)
+    return [str(row.customer_client.id) for row in rows]
 
 
 def _extract(client: GoogleAdsClient, account_ids: list[str], target_date: str) -> list[dict]:
@@ -173,7 +171,7 @@ def google_ads():
         )
         logger.info("google_ads target_dates=%s", [d.isoformat() for d in target_dates])
         client = _get_client()
-        account_ids = _list_accounts()
+        account_ids = _list_accounts(client)
         logger.info("google_ads accounts=%d", len(account_ids))
         rows: list[dict] = []
         for target_date in target_dates:

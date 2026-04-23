@@ -10,6 +10,7 @@ from airflow.decorators import dag, task
 from airflow.models.param import Param
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.adsinsights import AdsInsights
+from facebook_business.adobjects.user import User
 from facebook_business.api import FacebookAdsApi
 from facebook_business.exceptions import FacebookRequestError
 
@@ -54,19 +55,8 @@ def _init_api() -> None:
 
 
 def _list_accounts() -> list[str]:
-    connection = get_pg()
-    init_schemas(connection)
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT account_id FROM ops.managed_accounts "
-                "WHERE platform = %s AND enabled = 1",
-                [PLATFORM],
-            )
-            rows = cursor.fetchall()
-    finally:
-        connection.close()
-    return [row[0] for row in rows]
+    accounts = User(fbid="me").get_ad_accounts(fields=["account_id", "account_status"])
+    return [a["account_id"] for a in accounts if a.get("account_status") == 1]
 
 
 def _extract(account_ids: list[str], target_date: str) -> list[dict]:

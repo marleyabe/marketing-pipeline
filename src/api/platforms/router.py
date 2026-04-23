@@ -5,13 +5,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.api.auth import require_api_key
 from src.api.dates import lastmonth, lastweek, parse_range, yesterday
 from src.api.deps import pg
-from src.api.platforms.queries import daily_range
-from src.api.platforms.schema import SLUG_TO_DB, DailyMetricsRow
+from src.api.platforms.queries import daily_range, keywords_range
+from src.api.platforms.schema import SLUG_TO_DB, DailyMetricsRow, KeywordRow
 
 
 def build_platform_router(slug: str) -> APIRouter:
     platform_db = SLUG_TO_DB[slug]
     router = APIRouter(prefix=f"/{slug}", tags=[slug], dependencies=[Depends(require_api_key)])
+
+    if slug == "google":
+        @router.get("/keywords", response_model=list[KeywordRow])
+        def _keywords(
+            start_date: date = Query(..., alias="start-date"),
+            end_date: date | None = Query(default=None, alias="end-date"),
+            account_id: str | None = None,
+            connection=Depends(pg),
+        ):
+            try:
+                start, end = parse_range(start_date, end_date)
+            except ValueError as exception:
+                raise HTTPException(status_code=400, detail=str(exception)) from exception
+            return keywords_range(connection, start, end, account_id)
 
     @router.get("/yesterday", response_model=list[DailyMetricsRow])
     def _yesterday(account_id: str | None = None, connection=Depends(pg)):

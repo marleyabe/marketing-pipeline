@@ -53,17 +53,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    entrypoint: >
-      bash -c "
-        PGPASSWORD=$$POSTGRES_PASSWORD createdb -h postgres -U airflow marketing 2>/dev/null || true;
-        airflow db migrate &&
-        airflow users create
-          --username $${AIRFLOW_ADMIN_USER:?AIRFLOW_ADMIN_USER obrigatório}
-          --password $${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD obrigatório}
-          --firstname admin --lastname admin --role Admin
-          --email $${AIRFLOW_ADMIN_EMAIL:-admin@example.com} || true &&
-        cd $$DBT_PROJECT_DIR && dbt deps --no-version-check
-      "
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        PGPASSWORD=$$POSTGRES_PASSWORD createdb -h postgres -U airflow marketing 2>/dev/null || true
+        airflow db migrate
+        airflow users create --username "$$AIRFLOW_ADMIN_USER" --password "$$AIRFLOW_ADMIN_PASSWORD" --firstname admin --lastname admin --role Admin --email "$${AIRFLOW_ADMIN_EMAIL:-admin@example.com}" || true
+        cd "$$DBT_PROJECT_DIR" && DBT_LOG_PATH=/tmp/dbt-logs dbt deps --no-version-check
     restart: "no"
 
   airflow:
@@ -85,7 +83,7 @@ services:
 
   api:
     build: .
-    command: uvicorn src.api:app --host 0.0.0.0 --port 8000
+    entrypoint: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
     environment:
