@@ -59,3 +59,20 @@ models:
           - not_null
           - accepted_values:
               values: ['google_ads', 'meta_ads']
+
+  - name: google_ads_keywords_dedup
+    description: "Silver — google ads dedup mantendo granularidade de keyword/dia."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: keyword_id
+        tests: [not_null]
+      - name: keyword_text
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads']

@@ -44,3 +44,21 @@ models:
           - not_null
           - dbt_utils.expression_is_true:
               expression: ">= 0"
+
+  - name: google_ads_keywords
+    description: "Gold — keywords por account/dia (RN14: HAVING spend > 0)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [account_id, keyword_text, ad_group_name, campaign_name, date]
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: keyword_text
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: spend
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"

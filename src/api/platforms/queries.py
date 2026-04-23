@@ -50,23 +50,22 @@ def keywords_range(
     account_id: str | None = None,
 ) -> list[KeywordRow]:
     query = """
-        SELECT customer_id, MAX(customer_name), MAX(campaign_name), MAX(ad_group_name),
+        SELECT account_id, MAX(account_name), MAX(campaign_name), MAX(ad_group_name),
                keyword_text, MAX(match_type),
                CAST(SUM(impressions) AS BIGINT),
                CAST(SUM(clicks) AS BIGINT),
                CAST(SUM(spend) AS DOUBLE PRECISION),
                CAST(SUM(conversions) AS DOUBLE PRECISION)
-        FROM bronze.google_ads_raw
+        FROM gold.google_ads_keywords
         WHERE date BETWEEN %s AND %s
-          AND keyword_text IS NOT NULL AND keyword_text <> ''
     """
     parameters: list = [start, end]
     if account_id:
-        query += " AND customer_id = %s"
+        query += " AND account_id = %s"
         parameters.append(account_id)
     query += (
-        " GROUP BY customer_id, keyword_text, ad_group_name, campaign_name"
-        " ORDER BY customer_id, SUM(impressions) DESC"
+        " GROUP BY account_id, keyword_text, ad_group_name, campaign_name"
+        " ORDER BY account_id, SUM(impressions) DESC"
     )
     try:
         with connection.cursor() as cursor:

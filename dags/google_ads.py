@@ -2,18 +2,19 @@
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from airflow.datasets import Dataset
 from airflow.decorators import dag, task
-from airflow.models.param import Param
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 
-from dags._date_range import resolve_target_dates
-from dags.callbacks.discord_alert import notify_discord_failure
-from src.db import get_pg, init_schemas
-from src.loader import load_bronze
+from dags._extractor import (
+    ExtractorSpec,
+    date_range_params,
+    default_args,
+    run_extraction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def _credentials() -> dict:
     }
 
 
-def _get_client() -> GoogleAdsClient:
+def _build_client() -> GoogleAdsClient:
     return GoogleAdsClient.load_from_dict({**_credentials(), "use_proto_plus": True})
 
 
@@ -78,76 +79,60 @@ def _list_accounts(client: GoogleAdsClient) -> list[str]:
     return [str(row.customer_client.id) for row in rows]
 
 
-def _extract(client: GoogleAdsClient, account_ids: list[str], target_date: str) -> list[dict]:
+def _map_row(row) -> dict:
+    return {
+        "customer_id": str(row.customer.id),
+        "customer_name": row.customer.descriptive_name,
+        "campaign_id": str(row.campaign.id),
+        "campaign_name": row.campaign.name,
+        "ad_group_id": str(row.ad_group.id),
+        "ad_group_name": row.ad_group.name,
+        "keyword_id": str(row.ad_group_criterion.criterion_id),
+        "keyword_text": row.ad_group_criterion.keyword.text,
+        "match_type": row.ad_group_criterion.keyword.match_type.name,
+        "impressions": row.metrics.impressions,
+        "clicks": row.metrics.clicks,
+        "spend": row.metrics.cost_micros / 1_000_000,
+        "conversions": row.metrics.conversions,
+        "view_through_conversions": row.metrics.view_through_conversions,
+        "all_conversions": row.metrics.all_conversions,
+        "search_impression_share": row.metrics.search_impression_share,
+        "quality_score": row.ad_group_criterion.quality_info.quality_score,
+        "device": row.segments.device.name,
+        "date": row.segments.date,
+    }
+
+
+def _fetch_account(client: GoogleAdsClient, customer_id: str, target_date: str) -> list[dict]:
     service = client.get_service("GoogleAdsService")
+    try:
+        rows = service.search(
+            customer_id=customer_id,
+            query=KEYWORD_PERFORMANCE_QUERY.format(date=target_date),
+        )
+    except GoogleAdsException as error:
+        logger.error("google_ads API falhou account=%s date=%s: %s", customer_id, target_date, error)
+        raise
+    mapped = [_map_row(row) for row in rows]
+    logger.info("google_ads extract account=%s date=%s rows=%d", customer_id, target_date, len(mapped))
+    return mapped
+
+
+def _extract(client: GoogleAdsClient, account_ids: list[str], target_date: str) -> list[dict]:
     results: list[dict] = []
     for customer_id in account_ids:
-        try:
-            rows = service.search(
-                customer_id=customer_id,
-                query=KEYWORD_PERFORMANCE_QUERY.format(date=target_date),
-            )
-            account_rows = 0
-            for row in rows:
-                results.append({
-                    "customer_id": str(row.customer.id),
-                    "customer_name": row.customer.descriptive_name,
-                    "campaign_id": str(row.campaign.id),
-                    "campaign_name": row.campaign.name,
-                    "ad_group_id": str(row.ad_group.id),
-                    "ad_group_name": row.ad_group.name,
-                    "keyword_id": str(row.ad_group_criterion.criterion_id),
-                    "keyword_text": row.ad_group_criterion.keyword.text,
-                    "match_type": row.ad_group_criterion.keyword.match_type.name,
-                    "impressions": row.metrics.impressions,
-                    "clicks": row.metrics.clicks,
-                    "spend": row.metrics.cost_micros / 1_000_000,
-                    "conversions": row.metrics.conversions,
-                    "view_through_conversions": row.metrics.view_through_conversions,
-                    "all_conversions": row.metrics.all_conversions,
-                    "search_impression_share": row.metrics.search_impression_share,
-                    "quality_score": row.ad_group_criterion.quality_info.quality_score,
-                    "device": row.segments.device.name,
-                    "date": row.segments.date,
-                })
-                account_rows += 1
-            logger.info(
-                "google_ads extract account=%s date=%s rows=%d",
-                customer_id, target_date, account_rows,
-            )
-        except GoogleAdsException as error:
-            logger.error(
-                "google_ads API falhou account=%s date=%s: %s",
-                customer_id, target_date, error,
-            )
-            raise
+        results.extend(_fetch_account(client, customer_id, target_date))
     return results
 
 
-def _load(rows: list[dict]) -> int:
-    connection = get_pg()
-    init_schemas(connection)
-    try:
-        return load_bronze(
-            connection,
-            rows,
-            BRONZE_TABLE,
-            source=PLATFORM,
-            conflict_columns=BRONZE_CONFLICT_KEYS,
-        )
-    finally:
-        connection.close()
-
-
-default_args = {
-    "owner": "data-eng",
-    "retries": 3,
-    "retry_delay": timedelta(minutes=5),
-    "retry_exponential_backoff": True,
-    "max_retry_delay": timedelta(minutes=30),
-    "execution_timeout": timedelta(minutes=30),
-    "on_failure_callback": notify_discord_failure,
-}
+SPEC = ExtractorSpec(
+    platform=PLATFORM,
+    bronze_table=BRONZE_TABLE,
+    conflict_keys=BRONZE_CONFLICT_KEYS,
+    init_api=_build_client,
+    list_accounts=_list_accounts,
+    fetch_date=_extract,
+)
 
 
 @dag(
@@ -156,29 +141,13 @@ default_args = {
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=["extract", "google_ads"],
-    default_args=default_args,
-    params={
-        "start_date": Param(default=None, type=["null", "string"], format="date"),
-        "end_date": Param(default=None, type=["null", "string"], format="date"),
-    },
+    default_args=default_args(),
+    params=date_range_params(),
 )
-def google_ads():
+def google_ads() -> None:
     @task(outlets=[bronze_google_dataset])
     def extract(**context) -> int:
-        target_dates = resolve_target_dates(
-            context["params"].get("start_date"),
-            context["params"].get("end_date"),
-        )
-        logger.info("google_ads target_dates=%s", [d.isoformat() for d in target_dates])
-        client = _get_client()
-        account_ids = _list_accounts(client)
-        logger.info("google_ads accounts=%d", len(account_ids))
-        rows: list[dict] = []
-        for target_date in target_dates:
-            rows.extend(_extract(client, account_ids, target_date.isoformat()))
-        loaded = _load(rows)
-        logger.info("google_ads loaded rows=%d", loaded)
-        return loaded
+        return run_extraction(SPEC, context)
 
     extract()
 
