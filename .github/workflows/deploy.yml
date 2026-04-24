@@ -1,0 +1,51 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd /opt/marketing-pipeline
+            git fetch --quiet origin main
+            git reset --hard origin/main
+            docker compose -f docker-compose.yaml -f docker-compose.prod.yaml pull || true
+            docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --build
+            docker compose -f docker-compose.yaml -f docker-compose.prod.yaml ps
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd /opt/marketing-pipeline
+            for i in 1 2 3 4 5 6; do
+              code=$(docker compose -f docker-compose.yaml -f docker-compose.prod.yaml exec -T api curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo 000)
+              echo "attempt $i: $code"
+              [ "$code" = "200" ] && exit 0
+              sleep 5
+            done
+            echo "health check failed"
+            docker compose -f docker-compose.yaml -f docker-compose.prod.yaml logs --tail=50 api
+            exit 1
