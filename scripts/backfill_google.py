@@ -7,7 +7,7 @@ Por que existe:
     vários minutos de overhead.
 
     Este script chama exatamente a mesma pipeline resiliente de
-    dags._extractor (commit-por-partição + retry transiente), apenas
+    dags.shared.extractor (commit-por-partição + retry transiente), apenas
     fornecendo um `context` mock com os params de data, sem depender do
     Airflow. Dá pra rodar em container one-off na network do postgres.
 
@@ -18,9 +18,9 @@ Exemplo:
 import logging
 import sys
 
-from dags._extractor import run_extraction
+from dags.shared.extractor import run_extraction
 from dags.google_ads import KEYWORDS_SPEC, NEGATIVES_SPEC, SEARCH_TERMS_SPEC
-from dags._extractor import run_snapshot_extraction
+from dags.shared.extractor import run_snapshot_extraction
 
 
 def _parse_args(argv: list[str]) -> tuple[str, str]:

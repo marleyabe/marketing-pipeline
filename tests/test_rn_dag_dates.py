@@ -4,12 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from dags._date_range import resolve_target_dates
+from dags.shared.date_range import resolve_target_dates
 
 
 def test_rn16_both_empty_returns_yesterday():
     fixed_now = datetime(2026, 4, 20, 12, 0, 0)
-    with patch("dags._date_range.datetime") as mock_datetime:
+    with patch("dags.shared.date_range.datetime") as mock_datetime:
         mock_datetime.utcnow.return_value = fixed_now
         result = resolve_target_dates(None, None)
     assert result == [date(2026, 4, 19)]

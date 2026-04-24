@@ -6,8 +6,8 @@ import pytest
 from google.ads.googleads.errors import GoogleAdsException
 from grpc import StatusCode
 
-from dags._extractor import ExtractorSpec, _run_partitions
-from dags._retry import TRANSIENT_GRPC_CODES, _is_transient, call_with_retry
+from dags.shared.extractor import ExtractorSpec, _run_partitions
+from dags.shared.retry import TRANSIENT_GRPC_CODES, _is_transient, call_with_retry
 
 
 def _make_ads_error(code: StatusCode) -> GoogleAdsException:
@@ -55,14 +55,14 @@ def test_call_with_retry_retries_transient_then_succeeds():
             raise _make_ads_error(StatusCode.UNAVAILABLE)
         return "ok"
 
-    with patch("dags._retry.time.sleep"):
+    with patch("dags.shared.retry.time.sleep"):
         assert call_with_retry(flaky, "label", max_attempts=5, base_seconds=0) == "ok"
     assert calls["n"] == 3
 
 
 def test_call_with_retry_reraises_after_exhausted():
     fn = MagicMock(side_effect=_make_ads_error(StatusCode.RESOURCE_EXHAUSTED))
-    with patch("dags._retry.time.sleep"):
+    with patch("dags.shared.retry.time.sleep"):
         with pytest.raises(GoogleAdsException):
             call_with_retry(fn, "label", max_attempts=3, base_seconds=0)
     assert fn.call_count == 3
@@ -99,7 +99,7 @@ def test_run_partitions_commits_each_partition():
         loads.append(list(rows))
         return len(rows)
 
-    with patch("dags._extractor.load_to_bronze", side_effect=fake_load):
+    with patch("dags.shared.extractor.load_to_bronze", side_effect=fake_load):
         total = _run_partitions(_spec(fake_fetch), None, ["a1", "a2"], ["2026-04-01", "2026-04-02"])
 
     assert total == 4
@@ -124,7 +124,7 @@ def test_run_partitions_continues_on_partial_failure():
         loads.append(list(rows))
         return len(rows)
 
-    with patch("dags._extractor.load_to_bronze", side_effect=fake_load):
+    with patch("dags.shared.extractor.load_to_bronze", side_effect=fake_load):
         with pytest.raises(RuntimeError, match="incompleto"):
             _run_partitions(_spec(fake_fetch), None, ["a1", "a2"], ["2026-04-01", "2026-04-02"])
 
@@ -136,7 +136,7 @@ def test_run_partitions_raises_with_failed_sample_in_message():
     def fake_fetch(_api, accounts, date_iso):
         raise _make_ads_error(StatusCode.RESOURCE_EXHAUSTED)
 
-    with patch("dags._extractor.load_to_bronze", return_value=0):
+    with patch("dags.shared.extractor.load_to_bronze", return_value=0):
         with pytest.raises(RuntimeError) as exc:
             _run_partitions(_spec(fake_fetch), None, ["a1"], ["2026-04-01"])
     assert "2026-04-01/a1" in str(exc.value)
