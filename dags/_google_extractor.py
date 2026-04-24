@@ -6,7 +6,6 @@ e manual runs, sem arrastar Airflow pra dentro do import.
 
 import logging
 import os
-from typing import Any, Iterable
 
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
@@ -17,6 +16,7 @@ from dags._google_queries import (
     NEGATIVE_CAMPAIGN_QUERY,
     SEARCH_TERMS_QUERY,
 )
+from dags._retry import call_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,6 @@ def build_client() -> GoogleAdsClient:
 
 def list_accounts(client: GoogleAdsClient) -> list[str]:
     manager_id = os.environ["GOOGLE_LOGIN_CUSTOMER_ID"].replace("-", "")
-    service = client.get_service("GoogleAdsService")
     query = """
         SELECT customer_client.id
         FROM customer_client
@@ -45,16 +44,31 @@ def list_accounts(client: GoogleAdsClient) -> list[str]:
           AND customer_client.manager = FALSE
           AND customer_client.hidden = FALSE
     """
-    rows = service.search(customer_id=manager_id, query=query)
+    rows = _stream(client, manager_id, query, "list_accounts")
     return [str(row.customer_client.id) for row in rows]
 
 
-def _search(
-    client: GoogleAdsClient, customer_id: str, query: str, label: str,
-) -> Iterable[Any]:
+def _stream_once(
+    client: GoogleAdsClient, customer_id: str, query: str,
+) -> list:
+    # search_stream: conexão persistente, sem paginação. Materializamos a lista
+    # dentro do escopo do retry para que uma falha a meio do stream re-execute
+    # tudo de forma limpa.
     service = client.get_service("GoogleAdsService")
+    rows: list = []
+    for batch in service.search_stream(customer_id=customer_id, query=query):
+        rows.extend(batch.results)
+    return rows
+
+
+def _stream(
+    client: GoogleAdsClient, customer_id: str, query: str, label: str,
+) -> list:
     try:
-        return service.search(customer_id=customer_id, query=query)
+        return call_with_retry(
+            lambda: _stream_once(client, customer_id, query),
+            label=f"{label} account={customer_id}",
+        )
     except GoogleAdsException as error:
         logger.error("google_ads %s falhou account=%s: %s", label, customer_id, error)
         raise
@@ -102,7 +116,7 @@ def _map_keyword_row(row) -> dict:
 
 def _fetch_keywords(client: GoogleAdsClient, customer_id: str, target_date: str) -> list[dict]:
     query = KEYWORD_PERFORMANCE_QUERY.format(date=target_date)
-    rows = _search(client, customer_id, query, "keyword_view")
+    rows = _stream(client, customer_id, query, "keyword_view")
     mapped = [_map_keyword_row(row) for row in rows]
     logger.info("google_ads keywords account=%s date=%s rows=%d", customer_id, target_date, len(mapped))
     return mapped
@@ -146,7 +160,7 @@ def _map_search_term_row(row) -> dict:
 
 def _fetch_search_terms(client: GoogleAdsClient, customer_id: str, target_date: str) -> list[dict]:
     query = SEARCH_TERMS_QUERY.format(date=target_date)
-    rows = _search(client, customer_id, query, "search_term_view")
+    rows = _stream(client, customer_id, query, "search_term_view")
     mapped = [_map_search_term_row(row) for row in rows]
     logger.info("google_ads search_terms account=%s date=%s rows=%d", customer_id, target_date, len(mapped))
     return mapped
@@ -192,8 +206,8 @@ def _map_ad_group_negative(row, snapshot_date: str) -> dict:
 
 
 def _fetch_negatives(client: GoogleAdsClient, customer_id: str, snapshot_date: str) -> list[dict]:
-    campaign_rows = _search(client, customer_id, NEGATIVE_CAMPAIGN_QUERY, "campaign_negatives")
-    ad_group_rows = _search(client, customer_id, NEGATIVE_AD_GROUP_QUERY, "ad_group_negatives")
+    campaign_rows = _stream(client, customer_id, NEGATIVE_CAMPAIGN_QUERY, "campaign_negatives")
+    ad_group_rows = _stream(client, customer_id, NEGATIVE_AD_GROUP_QUERY, "ad_group_negatives")
     mapped = [_map_campaign_negative(r, snapshot_date) for r in campaign_rows]
     mapped += [_map_ad_group_negative(r, snapshot_date) for r in ad_group_rows]
     logger.info("google_ads negatives account=%s rows=%d", customer_id, len(mapped))
