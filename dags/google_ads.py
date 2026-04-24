@@ -1,7 +1,7 @@
 """Google Ads DAG. Três extrações encadeadas; só a última emite o Dataset
 que dispara o daily_transform (dbt).
 
-Lógica de API fica em dags._google_extractor para permitir execução sem Airflow.
+Lógica de API fica em dags.shared.google_extractor para permitir execução sem Airflow.
 """
 
 from datetime import datetime
@@ -9,14 +9,14 @@ from datetime import datetime
 from airflow.datasets import Dataset
 from airflow.decorators import dag, task
 
-from dags._extractor import (
+from dags.shared.extractor import (
     ExtractorSpec,
     date_range_params,
     default_args,
     run_extraction,
     run_snapshot_extraction,
 )
-from dags._google_extractor import (
+from dags.shared.google_extractor import (
     build_client,
     extract_keywords,
     extract_negatives,

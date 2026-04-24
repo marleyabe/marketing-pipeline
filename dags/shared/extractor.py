@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 from airflow.models.param import Param
 
-from dags._date_range import resolve_target_dates
+from dags.shared.date_range import resolve_target_dates
 from dags.callbacks.discord_alert import notify_discord_failure
 from src.db import get_pg, init_schemas
 from src.loader import load_bronze

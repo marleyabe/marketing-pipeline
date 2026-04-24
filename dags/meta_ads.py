@@ -14,7 +14,7 @@ from facebook_business.adobjects.user import User
 from facebook_business.api import FacebookAdsApi
 from facebook_business.exceptions import FacebookRequestError
 
-from dags._extractor import (
+from dags.shared.extractor import (
     ExtractorSpec,
     date_range_params,
     default_args,

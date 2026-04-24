@@ -10,13 +10,13 @@ import os
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 
-from dags._google_queries import (
+from dags.shared.google_queries import (
     KEYWORD_PERFORMANCE_QUERY,
     NEGATIVE_AD_GROUP_QUERY,
     NEGATIVE_CAMPAIGN_QUERY,
     SEARCH_TERMS_QUERY,
 )
-from dags._retry import call_with_retry
+from dags.shared.retry import call_with_retry
 
 logger = logging.getLogger(__name__)
 
