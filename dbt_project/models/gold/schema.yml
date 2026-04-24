@@ -62,3 +62,50 @@ models:
           - not_null
           - dbt_utils.expression_is_true:
               expression: "> 0"
+
+  - name: google_search_terms
+    description: "Gold — search terms reais por account/ad_group/dia (HAVING spend > 0)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [account_id, ad_group_name, search_term, matched_keyword_text, matched_keyword_match_type, date]
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: search_term
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: spend
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+  - name: google_negatives
+    description: "Gold — snapshot mais recente de negativas por account/scope."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: criterion_id
+        tests: [not_null]
+      - name: scope
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['campaign', 'ad_group']
+
+  - name: budget_pacing
+    description: "Gold — spend mês-corrente vs monthly_budget cadastrado (view)."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: platform
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads', 'meta_ads']
+      - name: pace_flag
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['over', 'under', 'on_track', 'unknown']

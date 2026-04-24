@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any, Callable
 
 from airflow.models.param import Param
@@ -70,4 +70,20 @@ def run_extraction(spec: ExtractorSpec, context: dict) -> int:
         rows.extend(spec.fetch_date(api_context, accounts, target_date.isoformat()))
     loaded = load_to_bronze(rows, spec)
     logger.info("%s loaded rows=%d", spec.platform, loaded)
+    return loaded
+
+
+def run_snapshot_extraction(spec: ExtractorSpec) -> int:
+    """Para recursos que não têm granularidade de data na API (ex.: negativas).
+
+    Extrai o estado atual uma única vez e carimba snapshot_date = hoje.
+    Exemplo: run_snapshot_extraction(NEGATIVES_SPEC)
+    """
+    api_context = spec.init_api()
+    accounts = spec.list_accounts(api_context)
+    snapshot_date = date.today().isoformat()
+    logger.info("%s snapshot accounts=%d date=%s", spec.platform, len(accounts), snapshot_date)
+    rows = spec.fetch_date(api_context, accounts, snapshot_date)
+    loaded = load_to_bronze(rows, spec)
+    logger.info("%s snapshot loaded rows=%d", spec.platform, loaded)
     return loaded

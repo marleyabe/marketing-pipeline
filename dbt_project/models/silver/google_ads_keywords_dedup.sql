@@ -6,9 +6,12 @@ WITH deduplicated AS (
         customer_name,
         campaign_id,
         campaign_name,
+        campaign_status,
         ad_group_id,
         ad_group_name,
+        ad_group_status,
         keyword_id,
+        criterion_status,
         keyword_text,
         match_type,
         device,
@@ -16,6 +19,8 @@ WITH deduplicated AS (
         clicks,
         spend,
         conversions,
+        conversion_value,
+        quality_score,
         date,
         _extracted_at,
         ROW_NUMBER() OVER (
@@ -40,6 +45,11 @@ SELECT
     CAST(SUM(COALESCE(clicks, 0)) AS BIGINT) AS clicks,
     CAST(SUM(COALESCE(spend, 0.0)) AS DOUBLE PRECISION) AS spend,
     CAST(SUM(COALESCE(conversions, 0.0)) AS DOUBLE PRECISION) AS conversions,
+    CAST(SUM(COALESCE(conversion_value, 0.0)) AS DOUBLE PRECISION) AS conversion_value,
+    CAST(AVG(quality_score) AS DOUBLE PRECISION) AS quality_score,
+    MAX(campaign_status) AS campaign_status,
+    MAX(ad_group_status) AS ad_group_status,
+    MAX(criterion_status) AS criterion_status,
     MAX(_extracted_at) AS _extracted_at,
     'google_ads' AS platform
 FROM deduplicated

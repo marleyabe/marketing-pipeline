@@ -5,8 +5,10 @@ import uvicorn
 from fastapi import APIRouter, Depends, FastAPI
 from pydantic import BaseModel
 
+from src.api.budget.router import router as budget_router
 from src.api.deps import pg
 from src.api.platforms.router import build_platform_router
+from src.api.reviews.router import router as reviews_router
 from src.api.users.router import router as users_router
 from src.db import SCHEMAS, get_pg, init_schemas
 
@@ -49,6 +51,8 @@ app.include_router(health_router)
 app.include_router(build_platform_router("google"))
 app.include_router(build_platform_router("meta"))
 app.include_router(users_router)
+app.include_router(budget_router)
+app.include_router(reviews_router)
 
 
 if __name__ == "__main__":

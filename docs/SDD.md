@@ -2,105 +2,88 @@
 
 ## Objetivo
 
-Pipeline ELT extrai Meta Ads + Google Ads → Postgres (medallion) → API REST. Sem UI.
+ELT Meta Ads + Google Ads → Postgres (medallion) → API REST com revisão automática de conta. Sem UI.
 
 ## Stack
 
-| Camada | Tecnologia |
-|--------|-----------|
+| Camada | Tech |
+|---|---|
 | Orquestração | Airflow 2.10 (LocalExecutor) |
 | Storage | Postgres 16 |
-| Transformação | dbt 1.8 |
+| Transform | dbt 1.8 via Cosmos |
 | API | FastAPI 0.115 |
-| Auth | API Key (SHA256 + pepper) |
+| Auth | API Key SHA256 + pepper, rolling 14d |
 
-## Schemas Postgres
+## Schemas
 
 | Schema | Conteúdo |
-|--------|----------|
-| `airflow` | Metadados Airflow |
-| `bronze` | Dados crus extraídos (`meta_ads_raw`, `google_ads_raw`) |
-| `silver` | Dados tratados (dbt: `google_ads`, `meta_ads`, `unified_campaigns`) |
-| `gold` | Métricas com RN aplicada (`daily_performance`, `weekly_performance`); filtra `spend > 0` (RN14) |
-| `ops` | `managed_accounts` (catálogo p/ extractors), `api_keys`, `api_audit_log` |
+|---|---|
+| `bronze` | Cru: `meta_ads_raw`, `google_ads_raw`, `google_search_terms_raw`, `google_negatives_raw` |
+| `silver` | Tipado + dedupe: `meta_ads`, `google_ads`, `google_ads_keywords_dedup`, `google_search_terms_dedup`, `google_negatives_dedup`, `unified_campaigns` |
+| `gold` | Com RN: `daily_performance` (inclui ROAS), `weekly_performance`, `google_ads_keywords`, `google_search_terms`, `google_negatives` (snapshot mais recente), `budget_pacing` (view) |
+| `ops` | `managed_accounts`, `client_budget`, `api_keys`, `api_audit_log` |
 | `users` | `app_users` |
 
-> `ops.managed_accounts` é fonte para extractors (quais contas puxar). API não consulta — `/clientes` lê `gold.daily_performance` (RN15).
+`ops.managed_accounts` alimenta extractors. `/clientes` lê `gold.daily_performance` (RN15). `/review` lê apenas gold (RN11 + REQ14).
 
 ## Arquitetura
 
 ```
-Meta/Google APIs
-      ↓ (DAG google_ads | meta_ads — SDK + extract inline)
-   Bronze (raw)
-      ↓ (daily_transform → dbt silver)
-   Silver (tratado)
-      ↓ (dbt gold + RN)
-    Gold
-      ↓ (FastAPI)
-   Cliente
+Google/Meta APIs
+   ↓ DAG extract (keywords + search_terms + negatives) → bronze
+   ↓ daily_transform (dbt silver → gold)
+   gold + ops.client_budget
+   ↓ FastAPI (review_flags) → JSON
+   MCP / dashboard
 ```
 
-## Estrutura
+## DAG google_ads
 
-```
-src/
-  api/
-    __init__.py        FastAPI app
-    auth.py            API key + admin gate
-    deps.py            pg dependency
-    dates.py           yesterday/lastweek/lastmonth/range
-    platforms/         endpoints google + meta (factory)
-    users/             /users, /createuser, /clientes
-  db.py                schemas + DDL + get_pg
-  loader.py            load_bronze (psycopg2 execute_values)
-dags/
-  google_ads.py        SDK + DAG fundida (params start_date/end_date)
-  meta_ads.py          idem
-  daily_transform.py   dbt Cosmos, trigger por Datasets
-  _date_range.py       resolve_target_dates (RN16) — puro, testável
-dbt_project/           silver + gold models
-scripts/create_api_key.py
-tests/                 1 arquivo por categoria RN (40 testes)
-```
+3 tasks encadeadas; dataset emitido no último passo:
 
-## Fluxo de auth
+1. `extract_keywords_task` — `keyword_view` → `bronze.google_ads_raw`
+2. `extract_search_terms_task` — `search_term_view` → `bronze.google_search_terms_raw`
+3. `snapshot_negatives_task` — `campaign_criterion` + `ad_group_criterion` (negative=TRUE) → `bronze.google_negatives_raw` (stamp `snapshot_date`)
 
-1. Admin cria user (`/createuser` ou seed manual)
-2. Admin gera token: `python scripts/create_api_key.py --name X [--user-id N]`
-3. Cliente envia `X-API-Key: <raw>` em todo request
-4. Server: hash + lookup `ops.api_keys` → checa `revoked_at`, `disabled_at`, idade `last_used_at`
-5. Hit válido atualiza `last_used_at` (rolling 14d)
+Lógica de API em `dags/_google_extractor.py` (sem Airflow), GAQL em `dags/_google_queries.py`. Backfill via `--conf` com `start_date`/`end_date` (RN16).
 
-## DAGs Airflow
+## /review — fluxo
 
-1 arquivo por plataforma + 1 transform. SDK + lógica inline na DAG (autocontido).
+1. `_resolve_period` → se ausente, `lastmonth()`
+2. `fetch_account_overview` valida conta
+3. Executa em paralelo conceitual: performance, campaigns, top keywords, search_terms buckets, negatives coverage, budget pacing
+4. `evaluate_all` aplica regras puras → signals
+5. Devolve `AccountReview` (Pydantic)
 
-| DAG | Schedule | Função |
-|-----|----------|--------|
-| `google_ads` | `0 5 * * *` + manual | Extract Google → bronze. Params `start_date`/`end_date` (RN16). Outlet Dataset |
-| `meta_ads` | `0 5 * * *` + manual | Extract Meta → bronze. Params idem. Outlet Dataset |
-| `daily_transform` | Datasets ↑ | dbt silver + gold (Cosmos). Dispara após ambos extractors |
+Cada `fetch_*` em `src/api/reviews/queries.py`; SQL vive em constantes no topo do módulo. Flags em `src/api/reviews/review_flags.py` (puras, testáveis).
 
-**Coordenação:** Airflow Datasets — extract publica `ads2u/bronze/<platform>`, transform agenda nos 2.
+## Auth
 
-**Backfill:** trigger manual da própria DAG com params; sem DAG separada.
+1. Admin cria user (`/createuser` ou seed)
+2. `scripts/create_api_key.py --name X [--user-id N]` emite raw
+3. Cliente envia `X-API-Key: <raw>`
+4. Server: hash + lookup → checa `revoked_at`, `disabled_at`, `last_used_at` (RN06–08, RN12)
+5. Hit válido rola janela 14d (RN07)
 
 ## Princípios
 
-- **KISS**: zero camada sem uso real
-- **DRY**: factory de routers para plataformas
-- **YAGNI**: sem session, sem refresh token, sem UI
-- **Test-first p/ RN**: cada regra tem teste dedicado
+- KISS · DRY · YAGNI
+- Test-first nas RNs puras
+- Lógica 3rd-party atrás de módulo fino (extractor por plataforma)
+- Funções ≤ 20 linhas, arquivos < 500, tipos explícitos (CLAUDE.md)
 
 ## Cobertura RN → camada
 
 | RN | Camada |
 |----|--------|
 | RN01-04 | `src/api/dates.py` |
-| RN05, RN15 | `src/api/users/router.py` (gold query) |
+| RN05, RN15 | `src/api/users/router.py` |
 | RN06-09, RN12 | `src/api/auth.py` |
 | RN10, RN14 | `dbt_project/models/gold/*.sql` |
-| RN11 | layout — API só lê `gold.*` |
-| RN13 | `src/api/users/router.py` (`create_user`) |
-| RN16 | `dags/_date_range.py` (`resolve_target_dates`) |
+| RN11, REQ14 | layout — API lê só `gold.*` |
+| RN13 | `src/api/users/router.py` |
+| RN16 | `dags/_date_range.py` |
+| RN17 | `src/api/reviews/` |
+| RN18 | `src/api/budget/` + `gold/budget_pacing.sql` |
+| RN19 | `dags/_google_extractor.py` + `silver/google_{search_terms,negatives}_dedup.sql` |
+| RN20 | `src/api/reviews/review_flags.py` |

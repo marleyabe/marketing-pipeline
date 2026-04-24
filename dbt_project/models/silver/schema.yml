@@ -76,3 +76,28 @@ models:
           - not_null
           - accepted_values:
               values: ['google_ads']
+
+  - name: google_search_terms_dedup
+    description: "Silver — search_term_view dedup por (date, ad_group, search_term, matched_keyword)."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: search_term
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+
+  - name: google_negatives_dedup
+    description: "Silver — snapshot diário de palavras-chave negativas (campaign+ad_group scope)."
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: criterion_id
+        tests: [not_null]
+      - name: scope
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['campaign', 'ad_group']
+      - name: snapshot_date
+        tests: [not_null]

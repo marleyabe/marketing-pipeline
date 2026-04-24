@@ -1,137 +1,65 @@
-"""Google Ads — extractor + DAG. 1 DAG fundindo daily + backfill via params."""
+"""Google Ads DAG. Três extrações encadeadas; só a última emite o Dataset
+que dispara o daily_transform (dbt).
 
-import logging
-import os
+Lógica de API fica em dags._google_extractor para permitir execução sem Airflow.
+"""
+
 from datetime import datetime
 
 from airflow.datasets import Dataset
 from airflow.decorators import dag, task
-from google.ads.googleads.client import GoogleAdsClient
-from google.ads.googleads.errors import GoogleAdsException
 
 from dags._extractor import (
     ExtractorSpec,
     date_range_params,
     default_args,
     run_extraction,
+    run_snapshot_extraction,
+)
+from dags._google_extractor import (
+    build_client,
+    extract_keywords,
+    extract_negatives,
+    extract_search_terms,
+    list_accounts,
 )
 
-logger = logging.getLogger(__name__)
-
 PLATFORM = "google_ads"
-BRONZE_TABLE = "google_ads_raw"
-BRONZE_CONFLICT_KEYS = ["date", "customer_id", "campaign_id", "ad_group_id", "keyword_id", "device"]
+BRONZE_KEYWORDS_TABLE = "google_ads_raw"
+BRONZE_KEYWORDS_CONFLICT = ["date", "customer_id", "campaign_id", "ad_group_id", "keyword_id", "device"]
+BRONZE_SEARCH_TERMS_TABLE = "google_search_terms_raw"
+BRONZE_SEARCH_TERMS_CONFLICT = ["date", "customer_id", "ad_group_id", "search_term", "matched_keyword_text", "matched_keyword_match_type"]
+BRONZE_NEGATIVES_TABLE = "google_negatives_raw"
+BRONZE_NEGATIVES_CONFLICT = ["snapshot_date", "customer_id", "scope", "criterion_id", "ad_group_id", "campaign_id"]
+
 bronze_google_dataset = Dataset("ads2u/bronze/google_ads")
 
 
-KEYWORD_PERFORMANCE_QUERY = """
-    SELECT
-        customer.id,
-        customer.descriptive_name,
-        campaign.id,
-        campaign.name,
-        ad_group.id,
-        ad_group.name,
-        ad_group_criterion.criterion_id,
-        ad_group_criterion.keyword.text,
-        ad_group_criterion.keyword.match_type,
-        metrics.impressions,
-        metrics.clicks,
-        metrics.cost_micros,
-        metrics.conversions,
-        metrics.view_through_conversions,
-        metrics.all_conversions,
-        metrics.search_impression_share,
-        ad_group_criterion.quality_info.quality_score,
-        segments.device,
-        segments.date
-    FROM keyword_view
-    WHERE segments.date = '{date}'
-      AND ad_group_criterion.status != 'REMOVED'
-"""
-
-
-def _credentials() -> dict:
-    return {
-        "developer_token": os.environ["GOOGLE_DEVELOPER_TOKEN"],
-        "client_id": os.environ["GOOGLE_CLIENT_ID"],
-        "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
-        "refresh_token": os.environ["GOOGLE_REFRESH_TOKEN"],
-        "login_customer_id": os.environ["GOOGLE_LOGIN_CUSTOMER_ID"],
-    }
-
-
-def _build_client() -> GoogleAdsClient:
-    return GoogleAdsClient.load_from_dict({**_credentials(), "use_proto_plus": True})
-
-
-def _list_accounts(client: GoogleAdsClient) -> list[str]:
-    manager_id = os.environ["GOOGLE_LOGIN_CUSTOMER_ID"].replace("-", "")
-    service = client.get_service("GoogleAdsService")
-    query = """
-        SELECT customer_client.id
-        FROM customer_client
-        WHERE customer_client.status = 'ENABLED'
-          AND customer_client.manager = FALSE
-          AND customer_client.hidden = FALSE
-    """
-    rows = service.search(customer_id=manager_id, query=query)
-    return [str(row.customer_client.id) for row in rows]
-
-
-def _map_row(row) -> dict:
-    return {
-        "customer_id": str(row.customer.id),
-        "customer_name": row.customer.descriptive_name,
-        "campaign_id": str(row.campaign.id),
-        "campaign_name": row.campaign.name,
-        "ad_group_id": str(row.ad_group.id),
-        "ad_group_name": row.ad_group.name,
-        "keyword_id": str(row.ad_group_criterion.criterion_id),
-        "keyword_text": row.ad_group_criterion.keyword.text,
-        "match_type": row.ad_group_criterion.keyword.match_type.name,
-        "impressions": row.metrics.impressions,
-        "clicks": row.metrics.clicks,
-        "spend": row.metrics.cost_micros / 1_000_000,
-        "conversions": row.metrics.conversions,
-        "view_through_conversions": row.metrics.view_through_conversions,
-        "all_conversions": row.metrics.all_conversions,
-        "search_impression_share": row.metrics.search_impression_share,
-        "quality_score": row.ad_group_criterion.quality_info.quality_score,
-        "device": row.segments.device.name,
-        "date": row.segments.date,
-    }
-
-
-def _fetch_account(client: GoogleAdsClient, customer_id: str, target_date: str) -> list[dict]:
-    service = client.get_service("GoogleAdsService")
-    try:
-        rows = service.search(
-            customer_id=customer_id,
-            query=KEYWORD_PERFORMANCE_QUERY.format(date=target_date),
-        )
-    except GoogleAdsException as error:
-        logger.error("google_ads API falhou account=%s date=%s: %s", customer_id, target_date, error)
-        raise
-    mapped = [_map_row(row) for row in rows]
-    logger.info("google_ads extract account=%s date=%s rows=%d", customer_id, target_date, len(mapped))
-    return mapped
-
-
-def _extract(client: GoogleAdsClient, account_ids: list[str], target_date: str) -> list[dict]:
-    results: list[dict] = []
-    for customer_id in account_ids:
-        results.extend(_fetch_account(client, customer_id, target_date))
-    return results
-
-
-SPEC = ExtractorSpec(
+KEYWORDS_SPEC = ExtractorSpec(
     platform=PLATFORM,
-    bronze_table=BRONZE_TABLE,
-    conflict_keys=BRONZE_CONFLICT_KEYS,
-    init_api=_build_client,
-    list_accounts=_list_accounts,
-    fetch_date=_extract,
+    bronze_table=BRONZE_KEYWORDS_TABLE,
+    conflict_keys=BRONZE_KEYWORDS_CONFLICT,
+    init_api=build_client,
+    list_accounts=list_accounts,
+    fetch_date=extract_keywords,
+)
+
+SEARCH_TERMS_SPEC = ExtractorSpec(
+    platform=PLATFORM,
+    bronze_table=BRONZE_SEARCH_TERMS_TABLE,
+    conflict_keys=BRONZE_SEARCH_TERMS_CONFLICT,
+    init_api=build_client,
+    list_accounts=list_accounts,
+    fetch_date=extract_search_terms,
+)
+
+NEGATIVES_SPEC = ExtractorSpec(
+    platform=PLATFORM,
+    bronze_table=BRONZE_NEGATIVES_TABLE,
+    conflict_keys=BRONZE_NEGATIVES_CONFLICT,
+    init_api=build_client,
+    list_accounts=list_accounts,
+    fetch_date=extract_negatives,
 )
 
 
@@ -145,11 +73,19 @@ SPEC = ExtractorSpec(
     params=date_range_params(),
 )
 def google_ads() -> None:
-    @task(outlets=[bronze_google_dataset])
-    def extract(**context) -> int:
-        return run_extraction(SPEC, context)
+    @task()
+    def extract_keywords_task(**context) -> int:
+        return run_extraction(KEYWORDS_SPEC, context)
 
-    extract()
+    @task()
+    def extract_search_terms_task(**context) -> int:
+        return run_extraction(SEARCH_TERMS_SPEC, context)
+
+    @task(outlets=[bronze_google_dataset])
+    def snapshot_negatives_task() -> int:
+        return run_snapshot_extraction(NEGATIVES_SPEC)
+
+    extract_keywords_task() >> extract_search_terms_task() >> snapshot_negatives_task()
 
 
 google_ads()

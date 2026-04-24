@@ -6,3 +6,10 @@ sources:
     tables:
       - name: meta_ads_raw
       - name: google_ads_raw
+      - name: google_search_terms_raw
+      - name: google_negatives_raw
+
+  - name: ops
+    schema: ops
+    tables:
+      - name: client_budget

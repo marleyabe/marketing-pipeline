@@ -99,6 +99,108 @@ BEGIN
 END $$;
 """
 
+# Colunas novas em google_ads_raw para alimentar review de conta
+# (status, ROAS). ADD COLUMN IF NOT EXISTS torna a migração idempotente.
+BRONZE_GOOGLE_ADS_RAW_ALTER = """
+ALTER TABLE bronze.google_ads_raw
+    ADD COLUMN IF NOT EXISTS campaign_status VARCHAR,
+    ADD COLUMN IF NOT EXISTS ad_group_status VARCHAR,
+    ADD COLUMN IF NOT EXISTS criterion_status VARCHAR,
+    ADD COLUMN IF NOT EXISTS conversion_value DOUBLE PRECISION
+"""
+
+BRONZE_GOOGLE_SEARCH_TERMS_RAW = """
+CREATE TABLE IF NOT EXISTS bronze.google_search_terms_raw (
+    customer_id VARCHAR,
+    customer_name VARCHAR,
+    campaign_id VARCHAR,
+    campaign_name VARCHAR,
+    ad_group_id VARCHAR,
+    ad_group_name VARCHAR,
+    search_term VARCHAR,
+    search_term_status VARCHAR,
+    matched_keyword_text VARCHAR,
+    matched_keyword_match_type VARCHAR,
+    impressions BIGINT,
+    clicks BIGINT,
+    spend DOUBLE PRECISION,
+    conversions DOUBLE PRECISION,
+    conversion_value DOUBLE PRECISION,
+    date DATE,
+    _extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    _source VARCHAR DEFAULT 'google_ads'
+)
+"""
+
+# Index sem COALESCE: o extractor normaliza None -> '' antes de inserir, o que
+# permite ON CONFLICT bater na chave natural. Com COALESCE na expressão,
+# ON CONFLICT (cols) não casaria.
+BRONZE_GOOGLE_SEARCH_TERMS_RAW_UNIQUE = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'bronze' AND indexname = 'bronze_google_search_terms_raw_natural_key'
+    ) THEN
+        CREATE UNIQUE INDEX bronze_google_search_terms_raw_natural_key
+        ON bronze.google_search_terms_raw (
+            date, customer_id, ad_group_id, search_term,
+            matched_keyword_text, matched_keyword_match_type
+        );
+    END IF;
+END $$;
+"""
+
+# Negativas são snapshot por dia. Cada task stampa snapshot_date para permitir
+# histórico. scope distingue negativa de campanha vs ad_group.
+BRONZE_GOOGLE_NEGATIVES_RAW = """
+CREATE TABLE IF NOT EXISTS bronze.google_negatives_raw (
+    customer_id VARCHAR,
+    campaign_id VARCHAR,
+    campaign_name VARCHAR,
+    ad_group_id VARCHAR,
+    ad_group_name VARCHAR,
+    criterion_id VARCHAR,
+    criterion_text VARCHAR,
+    match_type VARCHAR,
+    scope VARCHAR,
+    snapshot_date DATE,
+    _extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    _source VARCHAR DEFAULT 'google_ads'
+)
+"""
+
+# Negativas de campanha vêm com ad_group_id='' (não NULL) do extractor, para
+# permitir ON CONFLICT casar. Sem isso, cada re-run duplicaria linhas de campanha.
+BRONZE_GOOGLE_NEGATIVES_RAW_UNIQUE = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'bronze' AND indexname = 'bronze_google_negatives_raw_natural_key'
+    ) THEN
+        CREATE UNIQUE INDEX bronze_google_negatives_raw_natural_key
+        ON bronze.google_negatives_raw (
+            snapshot_date, customer_id, scope, criterion_id,
+            ad_group_id, campaign_id
+        );
+    END IF;
+END $$;
+"""
+
+CLIENT_BUDGET = """
+CREATE TABLE IF NOT EXISTS ops.client_budget (
+    account_id TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('google_ads', 'meta_ads')),
+    monthly_budget NUMERIC(14, 2) NOT NULL CHECK (monthly_budget > 0),
+    currency TEXT NOT NULL DEFAULT 'BRL',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (account_id, platform)
+)
+"""
+
 MANAGED_ACCOUNTS = """
 CREATE TABLE IF NOT EXISTS ops.managed_accounts (
     account_id TEXT NOT NULL,
@@ -173,7 +275,13 @@ def init_schemas(connection: psycopg2.extensions.connection) -> None:
         cursor.execute(BRONZE_META_ADS_RAW_UNIQUE)
         cursor.execute(BRONZE_GOOGLE_ADS_RAW)
         cursor.execute(BRONZE_GOOGLE_ADS_RAW_UNIQUE)
+        cursor.execute(BRONZE_GOOGLE_ADS_RAW_ALTER)
+        cursor.execute(BRONZE_GOOGLE_SEARCH_TERMS_RAW)
+        cursor.execute(BRONZE_GOOGLE_SEARCH_TERMS_RAW_UNIQUE)
+        cursor.execute(BRONZE_GOOGLE_NEGATIVES_RAW)
+        cursor.execute(BRONZE_GOOGLE_NEGATIVES_RAW_UNIQUE)
         cursor.execute(MANAGED_ACCOUNTS)
+        cursor.execute(CLIENT_BUDGET)
         cursor.execute(API_KEYS)
         cursor.execute(API_KEYS_ALTER_USER_ID)
         cursor.execute(API_AUDIT_LOG)
