@@ -1,0 +1,22 @@
+# Caddyfile compartilhado entre projetos no mesmo VPS.
+# Apps precisam estar na rede externa `caddy-net` e acessíveis pelo nome do container.
+
+{
+    email seu-email@exemplo.com
+}
+
+# --- marketing-pipeline ---
+airflow.seudominio.com {
+    encode zstd gzip
+    reverse_proxy marketing-pipeline-airflow-1:8080
+}
+
+api.seudominio.com {
+    encode zstd gzip
+    reverse_proxy marketing-pipeline-api-1:8000
+}
+
+# --- outro-projeto ---
+# app.outrodominio.com {
+#     reverse_proxy outro-projeto-web-1:3000
+# }
