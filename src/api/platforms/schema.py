@@ -6,6 +6,8 @@ from pydantic import BaseModel
 PlatformSlug = Literal["google", "meta"]
 PlatformDB = Literal["google_ads", "meta_ads"]
 
+# Convenção da API: slug só em prefixo de URL (/google, /meta); DB form em todo
+# campo `platform` de response body / input. Ver README § Convenção de plataforma.
 SLUG_TO_DB: dict[str, str] = {"google": "google_ads", "meta": "meta_ads"}
 
 
