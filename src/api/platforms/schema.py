@@ -3,10 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-PlatformSlug = Literal["google", "meta"]
 PlatformDB = Literal["google_ads", "meta_ads"]
-
-SLUG_TO_DB: dict[str, str] = {"google": "google_ads", "meta": "meta_ads"}
 
 
 class DailyMetricsRow(BaseModel):

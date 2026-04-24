@@ -48,8 +48,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Ads2u Marketing Pipeline API", version="0.4.0", lifespan=lifespan)
 app.include_router(health_router)
-app.include_router(build_platform_router("google"))
-app.include_router(build_platform_router("meta"))
+app.include_router(build_platform_router("google_ads"))
+app.include_router(build_platform_router("meta_ads"))
 app.include_router(users_router)
 app.include_router(budget_router)
 app.include_router(reviews_router)

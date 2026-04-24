@@ -6,7 +6,7 @@ from src.api.auth import require_api_key
 from src.api.dates import lastmonth, lastweek, parse_range, yesterday
 from src.api.deps import pg
 from src.api.platforms.queries import daily_range, keywords_range
-from src.api.platforms.schema import SLUG_TO_DB, DailyMetricsRow, KeywordRow
+from src.api.platforms.schema import DailyMetricsRow, KeywordRow
 
 
 def _parse_or_400(start_date: date, end_date: date | None) -> tuple[date, date]:
@@ -53,10 +53,11 @@ def _register_range_route(router: APIRouter, platform_db: str) -> None:
         return daily_range(connection, platform_db, start, end, account_id)
 
 
-def build_platform_router(slug: str) -> APIRouter:
-    platform_db = SLUG_TO_DB[slug]
-    router = APIRouter(prefix=f"/{slug}", tags=[slug], dependencies=[Depends(require_api_key)])
-    if slug == "google":
+def build_platform_router(platform_db: str) -> APIRouter:
+    router = APIRouter(
+        prefix=f"/{platform_db}", tags=[platform_db], dependencies=[Depends(require_api_key)]
+    )
+    if platform_db == "google_ads":
         _register_keywords_route(router)
     _register_window_routes(router, platform_db)
     _register_range_route(router, platform_db)

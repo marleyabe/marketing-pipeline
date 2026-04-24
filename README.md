@@ -31,9 +31,9 @@ Request: header `X-API-Key: <raw>`.
 | GET | `/health` | pública |
 | GET | `/review/{account_id}[?start-date=&end-date=]` | token |
 | GET/PUT | `/budget/{account_id}[/{platform}]` | token |
-| GET | `/google[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=&account_id=]` | token |
-| GET | `/google/keywords?start-date=[&end-date=&account_id=]` | token |
-| GET | `/meta[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=]` | token |
+| GET | `/google_ads[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=&account_id=]` | token |
+| GET | `/google_ads/keywords?start-date=[&end-date=&account_id=]` | token |
+| GET | `/meta_ads[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=]` | token |
 | GET | `/clientes[/{id}]` | token |
 | GET | `/users` · POST `/createuser` | admin |
 
