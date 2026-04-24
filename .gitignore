@@ -13,6 +13,10 @@ env/
 
 # Environment
 .env
+.env.prod
+
+# Prod backups (montados pelo postgres-backup)
+/backups/
 
 # IDE
 .vscode/
