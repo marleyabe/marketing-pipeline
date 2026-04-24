@@ -31,20 +31,13 @@ Request: header `X-API-Key: <raw>`.
 | GET | `/health` | pública |
 | GET | `/review/{account_id}[?start-date=&end-date=]` | token |
 | GET/PUT | `/budget/{account_id}[/{platform}]` | token |
-| GET | `/google[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=&account_id=]` | token |
-| GET | `/google/keywords?start-date=[&end-date=&account_id=]` | token |
-| GET | `/meta[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=]` | token |
+| GET | `/google_ads[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=&account_id=]` | token |
+| GET | `/google_ads/keywords?start-date=[&end-date=&account_id=]` | token |
+| GET | `/meta_ads[/{yesterday\|lastweek\|lastmonth}]` `[?start-date=&end-date=]` | token |
 | GET | `/clientes[/{id}]` | token |
 | GET | `/users` · POST `/createuser` | admin |
 
 Range ausente ⇒ últimos 30 dias (review) ou dia único (demais). Datas ISO `YYYY-MM-DD`.
-
-### Convenção de plataforma
-
-- **URL (slug)**: `google`, `meta` — usado apenas em prefixos de rota (`/google`, `/meta`).
-- **Response body + input (DB form)**: `google_ads`, `meta_ads` — em todo campo `platform` de JSON (`/clientes`, `/budget`, `/review.account.platform`, `DailyMetricsRow.platform`) e no path param `/budget/{account_id}/{platform}`.
-- Mapeamento em `src/api/platforms/schema.py::SLUG_TO_DB`. Clientes que navegam da URL pro payload precisam aplicar: `{"google": "google_ads", "meta": "meta_ads"}`.
-- `pace_flag` canônico: `"over" | "under" | "on_track" | "unknown"` (enforced em `dbt_project/models/gold/schema.yml`).
 
 ## Backfill
 
