@@ -48,6 +48,7 @@ services:
 
   airflow-init:
     build: .
+    user: "${AIRFLOW_UID:-50000}:0"
     environment: *airflow-env
     volumes: *airflow-volumes
     depends_on:
@@ -66,6 +67,7 @@ services:
 
   airflow:
     build: .
+    user: "${AIRFLOW_UID:-50000}:0"
     command: bash -c "airflow scheduler & airflow webserver"
     environment: *airflow-env
     volumes: *airflow-volumes
